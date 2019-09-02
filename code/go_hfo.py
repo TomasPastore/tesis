@@ -4,11 +4,12 @@ import math as mt
 import numpy as np
 
 from scipy.stats import circmean
-import sklearn.metrics as metrics
 from astropy.stats import rayleightest
 from astropy import units as u
 from decimal import Decimal
-
+from matplotlib import pyplot as plt
+# from ggplot import *
+import sklearn.metrics as metrics
 
 class Database(object):
     @staticmethod
@@ -16,8 +17,6 @@ class Database(object):
         return MongoClient("mongodb://localhost:27017")
 
 #Electrodes, HFO, patients, metrics, experiments, graph, models, subir al repo
-
-class Patient():
 
 class Electrode():
     def __init__(self, count, total_time, soz):
@@ -31,30 +30,14 @@ class Electrode():
     def soz_bool(db_representation_str):
         return (True if db_representation_str == "1" else False)
 
-class HFO():
 
-class Metrics():
-
-class Experiments():
-
-
-class Models():
-
-    #Random forest
-    def random_forest(self):
-
-    def __init__(self):
-        self.rm = self.random_forest()
-
-#Aux
-
-def save_json(electrodes_info_p):
-    import json
-    with open("patient_electrode_info.json", "w") as file:
-        json.dump(electrodes_info_p, file, indent=4, sort_keys=True)
+#Types
+# type 4 == fast ronO
+# type 5 == fast Rons
 
 
-def get_electrodes_data(electrodes_collection, hfo_collection, hfo_type):
+
+def electrodes_data(electrodes_collection, hfo_collection, hfo_type):
     electrodes = electrodes_collection.find(filter={},
                                             projection=['patient_id', 'file_block', 'soz', 'electrode'])
 
@@ -72,7 +55,7 @@ def get_electrodes_data(electrodes_collection, hfo_collection, hfo_type):
         soz = soz_bool(e['soz'])
         patients[patient_id] = dict()
         patients[patient_id][electrode_name] = dict()
-        patients[patient_id][electrode_name][file_block] = ElectrodeInfo(0, None, soz)
+        patients[patient_id][electrode_name][file_block] = Electrode(0, None, soz)
 
     for h in hfos:
         patient_id = h['patient_id']
@@ -88,7 +71,7 @@ def get_electrodes_data(electrodes_collection, hfo_collection, hfo_type):
             patients[patient_id][electrode_name] = dict()
 
         if file_block not in patients[patient_id][electrode_name].keys():
-            patients[patient_id][electrode_name][file_block] = ElectrodeInfo(1, block_duration, soz)
+            patients[patient_id][electrode_name][file_block] = Electrode(1, block_duration, soz)
 
         else:  # Case: file block was already defined either by another hfo or by Electrodes db
             patients[patient_id][electrode_name][file_block].count += 1
@@ -122,78 +105,13 @@ def get_electrodes_data(electrodes_collection, hfo_collection, hfo_type):
             hfo_rates_all.append(electrodes_info[patient_id][electrode_name]['hfo_rate'])
     return soz_array_all, hfo_rates_all
 
-
-
-
-def main():
-    connection = Database_connection.get_connection()
-    db = connection.deckard_new
-    hfo_collection = db.HFOs
-    electrodes_collection = db.Electrodes
-
-    soz_arrays = []
-    hfo_rates = []
-    legends = []
-    hfo_type_names = ['ronO', 'rons', 'spikes', 'fast ronO', 'fast rons', 'sharp spikes']
-    for i in range(len(hfo_type_names)):
-        soz_array, hfo_rate = get_electrodes_data(electrodes_collection, hfo_collection, hfo_type=str(i + 1))
-        soz_arrays.append(soz_array)
-        hfo_rates.append(hfo_rate)
-        legends.append('{hfo_type_name} type, {n_electrodes} electrodes.'.format(hfo_type_name=hfo_type_names[i],
-                                                                                 n_electrodes=len(soz_array)))
-
-    plot_rocs(soz_arrays, hfo_rates, legends)
-
-
-if __name__ == "__main__":
-    main()
-
-
-def main(angle_step):
-    connection = Database_connection.get_connection()
-    db = connection.deckard_new
-    HFOs = db.HFOs
-
-    count_unique_patients_zone(HFOs, 'Brodmann area 21')
-    # Query 2 rose plots
-    # rose_plot(collection,angle_step, 'Brodmann area 21')
-
-    # rose_plot(HFOs, angle_step, 'Hippocampus')
-    '''
-    rose_plot(collection,angle_step, 'Brodmann area 28')
-    rose_plot(collection,angle_step, 'Brodmann area 34')
-    rose_plot(collection,angle_step, 'Brodmann area 35')
-    rose_plot(collection,angle_step, 'Brodmann area 36')'''
-
-
-class Database_connection(object):
-    @staticmethod
-    def get_connection():
-        return MongoClient("mongodb://localhost:27017")
-
-
-def rose_plot(collection, angle_step, loc_name):
-    count_by_group, step, mean_angle, pvalue, hfo_count = get_cluster_angles(collection=collection, amp_step=angle_step,
-                                                                             loc5=loc_name)
-    angles = []
-    values = []
-    print('{name}. Count by fase group \n'.format(name=loc_name))
-    print(count_by_group)
-    for k, v in count_by_group.items():
-        angles.append(step * float(k))
-        values.append(v)
-
-    polar_bar_plot(angles, values, loc_name=loc_name, mean_angle=mean_angle, pvalue=pvalue, hfo_count=hfo_count)
-
-
-# type 4 == fast ronO type 5 == fast Rons
-def get_cluster_angles(collection, amp_step, loc5='$exists'):
+def angle_clusters(collection, amp_step, crit, angle_name):
     angle_grouped = {str(angle_group_id): 0 for angle_group_id in range(mt.floor((2 * np.pi) / amp_step))}
-    docs = collection.find({'$and': [{'type': "5"}, {'spike': 1}, {'intraop': '0'}, {'soz': '1'}, {'loc5': loc5}]})
+    docs = collection.find(crit)
     hfo_count = docs.count()
     angles = []
     for doc in docs:
-        angle = doc['spike_angle'] % (2 * np.pi)  # Normalizing to 0 -- 2 pi
+        angle = doc[angle_name] % (2 * np.pi)  # Normalizing to 0 -- 2 pi
         angles.append(angle)
         angle_group_id = mt.floor(angle / amp_step)
         angle_grouped[str(angle_group_id)] += 1  # increment count of group
@@ -207,6 +125,33 @@ def get_cluster_angles(collection, amp_step, loc5='$exists'):
 
     return angle_grouped, amp_step, mean_angle, pvalue, hfo_count
 
+def unique_patients(collection, crit):
+    # Unique patients ids for the filter below
+    hfos_in_zone = collection.find(crit)
+    docs = set()
+    for doc in hfos_in_zone:
+        docs.add(doc['patient_id'])
+    patient_ids = list(docs)
+    patient_ids.sort()
+    print("Unique patients count in {0}: {1}".format(zone, len(patient_ids)))
+    print(patient_ids)
+
+#Graphics
+
+def rose_plot(collection, angle_step=(np.pi / 9)):
+    criterion = {'$and': [{'type': "5"}, {'spike': 1}, {'intraop': '0'}, {'soz': '1'}, {'loc5': 'Amygdala'}]}
+    count_by_group, step, hfo_count, mean_angle, pvalue  = angle_clusters(collection = collectio,
+                                                                             amp_step = angle_step,
+                                                                             crit = criterion)
+    angles = []
+    values = []
+    print('{name}. Count by fase group \n'.format(name=loc_name))
+    print(count_by_group)
+    for k, v in count_by_group.items():
+        angles.append(step * float(k))
+        values.append(v)
+
+    polar_bar_plot(angles, values, loc_name=loc_name, mean_angle=mean_angle, pvalue=pvalue, hfo_count=hfo_count)
 
 def polar_bar_plot(angles, values, loc_name, mean_angle, pvalue, hfo_count):
     # Data
@@ -289,18 +234,66 @@ def polar_bar_plot(angles, values, loc_name, mean_angle, pvalue, hfo_count):
     fig.canvas.mpl_connect("motion_notify_event", hover)
     plt.show()
 
+#Results
 
-def count_unique_patients_zone(HFOs, zone):
-    # unique patients ids for the filter below
-    hfos_in_zone = HFOs.find({'$and': [{'intraop': '0'}, {'loc5': zone}]})
-    docs = set()
-    for doc in hfos_in_zone:
-        docs.add(doc['patient_id'])
-    patient_ids = list(docs)
-    patient_ids.sort()
-    print("Unique patients count in {0}: {1}".format(zone, len(patient_ids)))
-    print(patient_ids)
+def plot_rocs(oracles, preds, title, legends):
+    plt.title('Receiver Operating Characteristic by HFO type.\nHippocampus electrodes.')
+    plt.plot([0, 1], [0, 1], 'r--')
+    plt.xlim([0, 1])
+    plt.ylim([0, 1])
+    plt.ylabel('True Positive Rate')
+    plt.xlabel('False Positive Rate')
 
+    colors = ['b', 'g', 'c', 'm', 'y', 'k']
+
+    # calculate the fpr and tpr for all thresholds of the classification
+    for i in range(len(oracles)):
+        fpr, tpr, threshold = metrics.roc_curve(oracles[i], preds[i])
+        roc_auc = metrics.auc(fpr, tpr)
+        plt.plot(fpr, tpr, colors[i], label=legends[i] + ' AUC = %0.2f' % roc_auc)
+
+    plt.legend(loc='lower right')
+    plt.show()
+
+    # method II: ggplot
+    # df = pd.DataFrame(dict(fpr = fpr, tpr = tpr))
+    # ggplot(df, aes(x = 'fpr', y = 'tpr')) + geom_line() + geom_abline(linetype = 'dashed')
+
+def soz_bool(db_representation_str):
+    return ( True if db_representation_str == "1" else False)
+
+def save_json(electrodes_info_p):
+    import json
+    with open("patient_electrode_info.json", "w") as file:
+        json.dump(electrodes_info_p, file, indent=4, sort_keys=True)
+
+
+def main():
+    db = Database()
+    connection = db.get_connection()
+    db = connection.deckard_new
+    hfo_collection = db.HFOs
+    electrodes_collection = db.Electrodes
+
+    #unique_patients(HFOs, {'$and': [{'intraop': '0'},{'loc5' : 'Brodmann area 21'}]})
+
+    #Graphics
+    #rose_plot(collection,angle_step, 'Brodmann area 28')
+
+    #Rocs
+    soz_arrays = []
+    hfo_rates = []
+    legends = []
+    hfo_type_names = ['ronO', 'rons', 'spikes', 'fast ronO', 'fast rons', 'sharp spikes']
+
+    for i in range(len(hfo_type_names)):
+        soz_array, hfo_rate = electrodes_data(electrodes_collection, hfo_collection, hfo_type=str(i + 1))
+        soz_arrays.append(soz_array)
+        hfo_rates.append(hfo_rate)
+        legends.append('{hfo_type_name} type, {n_electrodes} electrodes.'.format(hfo_type_name=hfo_type_names[i],
+                                                                                 n_electrodes=len(soz_array)))
+    title = 'Title'
+    plot_rocs(soz_arrays, hfo_rates, title, legends)
 
 if __name__ == "__main__":
-    main(angle_step=(np.pi / 9))  # 20 degrees
+    main()
