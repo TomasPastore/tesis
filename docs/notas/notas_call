@@ -1,0 +1,19 @@
+agarran los electrodos y reducen media, sd, media y sd del tiempo, no miran los patrones.  por cada epoch uuna topografia cada paciente tiene su label 500 epochs por paciente, 400 pacientes  = 20000 epochs
+
+todos los labels de un paciente son iguales. existe un patron espacio temporal mejor que el sd media?
+
+1 topografia
+
+2 por cada paciente tienen conectividad. matriz qu no analizaron, para cada electrodo hacen la mediana pero no la miraron wsmi weighted simbolyc m information
+
+3 decoding
+
+bias ? 
+
+400 pacientes, 2 matrices, senal cruda, topografia de los marcadores, de los features ya extraidos, numero de electrodo posicion en la cabeza. permitation cluster test
+
+ver si se puede hacer un salto univariado y multivariado .
+
+buscaria una validacion con un experimento chiquito
+
+objetivo tratar de mejorar la prediccion
