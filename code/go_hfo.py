@@ -14,26 +14,33 @@ from sklearn.model_selection import train_test_split
 from sklearn_pandas import DataFrameMapper, cross_val_score
 import pandas as pd
 import sklearn.preprocessing, sklearn.decomposition, \
-       sklearn.linear_model, sklearn.pipeline, sklearn.metrics
+    sklearn.linear_model, sklearn.pipeline, sklearn.metrics
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.ensemble import RandomForestRegressor
 
 hfo_types = ['RonO', 'RonS', 'Spikes', 'Fast RonO', 'Fast RonS', 'Sharp Spikes']
 type_id = {name: (index + 1) for index, name in enumerate(hfo_types)}
+
+
 def encode_type_name(name):
     return hfo_types.index(name) + 1
+
+
 def decode_type_name(type_id):
     return hfo_types[type_id - 1]
 
+
 inconsistencies = {}
-def log(text, msg_type=None, patient=None, electrode=None):
+
+
+def log(msg='Default log_msg', msg_type=None, patient=None, electrode=None):
     LOG = False
     if LOG:
-        print(text)
+        print(msg)
 
     if msg_type is not None:
-        assert(patient is not None)
-        assert(electrode is not None)
+        assert (patient is not None)
+        assert (electrode is not None)
 
         if not patient in inconsistencies.keys():
             inconsistencies[patient] = dict()
@@ -47,12 +54,13 @@ def log(text, msg_type=None, patient=None, electrode=None):
         inconsistencies[patient][electrode][msg_type] += 1
 
 
-#Classes
+# Classes
 
 class Database(object):
     @staticmethod
     def get_connection():
         return MongoClient("mongodb://admin:admin@localhost:27017")
+
 
 class Patient():
     def __init__(self, id, age, file_blocks, electrodes=[]):
@@ -67,9 +75,12 @@ class Patient():
     def electrode_names(self):
         return [e.name for e in self.electrodes]
 
-default_hfos_dict = {type:[] for type in hfo_types }
+
+default_hfos_dict = {type: [] for type in hfo_types}
+
+
 class Electrode():
-    def __init__(self, name, soz, soz_sc, hfos = default_hfos_dict, loc5=None):
+    def __init__(self, name, soz, soz_sc, hfos=default_hfos_dict, loc5=None):
         self.name = name
         self.soz = soz
         self.soz_sc = soz_sc
@@ -79,11 +90,12 @@ class Electrode():
     def add(self, hfo):
         self.hfos[hfo.type].append(hfo)
 
+
 class HFO():
     def __init__(self, type, file_block, duration, intraop,
                  fr_duration, r_duration,
                  freq_av, freq_pk,
-                 power_av, power_pk,):
+                 power_av, power_pk, ):
         self.type = type
         self.type_id = encode_type_name(type)
         self.file_block = file_block
@@ -96,9 +108,9 @@ class HFO():
         self.power_av = power_av
         self.power_pk = power_pk
 
-#Fast queries
-def unique_patients(collection, crit):
 
+# Fast queries
+def unique_patients(collection, crit):
     # Unique patients ids for filter crit
     # Usage example
     # unique_crit = {'$and': [{'intraop': '0'}, {'loc5': 'Brodmann area 21'}]}
@@ -112,53 +124,86 @@ def unique_patients(collection, crit):
     print("Unique patients count: {0}".format(len(patient_ids)))
     print(patient_ids)
 
-#Loading Data
+
+# Loading Data
 def load_hfos(source, type, zone, projection):
-    return source.find(filter = {"$and": [{'type': type},
-                                          {'loc5': zone}
-                                         ]},
-                       projection = projection)
+    return source.find(filter={"$and": [{'type': type},
+                                        {'loc5': zone}
+                                        ]},
+                       projection=projection)
+
 
 def parse_electrodes(electrodes):
     patients = dict()
     for e in electrodes:
-        #Patient level
+        # Patient level
+        patient = None
         if not e['patient_id'] in patients.keys():
-            patients[e['patient_id']] = Patient(
-                id = e['patient_id'],
-                age = None if e['age'] == "empty" else int(e['age']),
-                file_blocks ={int(e['file_block'])}
+            patient = Patient(
+                id=e['patient_id'],
+                age=None if e['age'] == "empty" else int(e['age']),
+                file_blocks={int(e['file_block'])}
             )
-        # Check patient consistency
-        age = None if e['age'] == "empty" else int(e['age'])
-        if age != patients[e['patient_id']].age:
-            print('Warning, age should be consistent'\
-                  ' between blocks of the same patient')
-            if age is not None:
-                patients[e['patient_id']].age = age
+            patients[e['patient_id']] = patient
+        else:
+            # Check patient consistency
+            patient = patients[e['patient_id']]
+            age = None if e['age'] == "empty" else int(e['age'])
+            if age != patient.age:
+                print('Warning, age should be consistent' \
+                      ' between blocks of the same patient')
+                if age is not None:
+                    patient.age = age
+            patient.file_blocks.add(e['file_block'])
 
-        patients[e['patient_id']].file_blocks.add(e['file_block'])
-
-        #Electrode level
+        # Electrode level
         electrode = None
-        if not e['electrode'][0] in patients[e['patient_id']].electrode_names():
+        loc5 = None
+        if isinstance(e['loc5'], str):
+            loc5 = e['loc5']
+        elif isinstance(e['loc5'], list):
+            loc5 = None if len(e['loc5']) == 0 else e['loc5'][0]
+        else:
+            raise NotImplementedError('Unknown loc5 type in parse electrodes')
+
+        if not e['electrode'][0] in patient.electrode_names():
             electrode = Electrode(
                 e['electrode'][0],
                 soz_bool(e['soz']),
-                soz_bool(e['soz_sc'])
+                soz_bool(e['soz_sc']),
+                loc5=loc5
             )
+            patients[patient.id].add_electrode(electrode)
         else:
             electrode = [e2 for e2 in patients[e['patient_id']].electrodes if e2.name == e['electrode'][0]][0]
-            if (soz_bool(e['soz']) != electrode.soz) or (soz_bool(e['soz_sc']) != electrode.soz_sc):
-                log('Warning, soz disagreement among blocks in ' \
-                      'the same (patient_id, electrode), ' \
-                      'running OR between values', msg_type= 'SOZ_0',
-                    patient=e['patient_id'], electrode = e['electrode'][0])
+            #Check consistency
+            if (    soz_bool(e['soz']) != electrode.soz or
+                    soz_bool(e['soz_sc']) != electrode.soz_sc):
+                log(
+                    msg=('Warning, soz disagreement among blocks in ' 
+                         'the same (patient_id, electrode), ' 
+                         'running OR between values'),
+                    msg_type='SOZ_0',
+                    patient=e['patient_id'],
+                    electrode=e['electrode'][0]
+                    )
                 electrode.soz = electrode.soz or soz_bool(e['soz'])
                 electrode.soz_sc = electrode.soz_sc or soz_bool(e['soz_sc'])
 
-        patients[e['patient_id']].add_electrode(electrode)
+            if electrode.loc5 is None:
+                electrode.loc5 = loc5
+            elif loc5 is not None and loc5 != electrode.loc5:
+                log(msg=('Warning, loc5 disagreement among blocks in '
+                         'the same (patient_id, electrode), '
+                         'Priority to Hippocampus'),
+                    msg_type='LOC5',
+                    patient=patient.id,
+                    electrode=electrode.name
+                    )
+                if loc5 == 'Hippocampus':
+                    electrode.loc5 = loc5
     return patients
+
 
 def parse_hfos(patients, hfo_collection, spike_kind):
     for h in hfo_collection:
@@ -166,62 +211,83 @@ def parse_hfos(patients, hfo_collection, spike_kind):
         # Patient level
         if h['patient_id'] not in patients.keys():
             patient = Patient(
-                id = h['patient_id'],
-                age = None if h['age'] == "empty" else int(h['age']),
-                file_blocks ={int(h['file_block'])},
+                id=h['patient_id'],
+                age=None if h['age'] == "empty" else int(h['age']),
+                file_blocks={int(h['file_block'])},
             )
             patients[h['patient_id']] = patient
         else:
-            #Check consistency of patient attributes
+            patient = patients[h['patient_id']]
+            # Check consistency of patient attributes
             age = None if h['age'] == "empty" else int(h['age'])
-            if age != patients[h['patient_id']].age:
+            if age != patient.age:
                 log('Warning, age should be consistent' \
-                      ' between blocks of the same patient')
+                    ' between blocks of the same patient')
                 if age is not None:
-                    patients[h['patient_id']].age = age
-            patients[h['patients_id']].file_blocks.add(h['file_block'])
-            patient = patients[h['patients_id']]
+                    patient.age = age
+            patient.file_blocks.add(h['file_block'])
 
         # Electrode level
         electrode = None
+        loc5 = h['loc5'] if isinstance(h['loc5'], str) and \
+                            len(h['loc5'])>0 else None
+
         if not h['electrode'][0] in patient.electrode_names():
             electrode = Electrode(
                 h['electrode'][0],
                 soz_bool(h['soz']),
                 soz_bool(h['soz_sc']),
-                loc5 = h['loc5']
+                loc5=loc5
             )
-
-            patients[h['patients_id']].add_electrode(electrode)
+            patient.add_electrode(electrode)
         else:
-            electrode = [e for e in patients[e['patient_id']].electrodes if e.name == h['electrode'][0]][0]
-            if (soz_bool(h['soz']) != electrode.soz) or (soz_bool(h['soz_sc']) != electrode.soz_sc):
-                log('Warning, soz disagreement among hfos in '\
-                      'the same patient_id, electrode, '\
-                      'running OR between values', msg_type= 'SOZ_0',
-                    patient = h['patient_id'], electrode = h['electrode'][0])
+            electrode = [e for e in patient.electrodes if e.name == h['electrode'][0]][0]
+            #Check consistency
+            if (soz_bool(h['soz']) != electrode.soz or
+                    soz_bool(h['soz_sc']) != electrode.soz_sc):
+                log(msg=('Warning, soz disagreement among hfos in '
+                         'the same patient_id, electrode, '
+                         'running OR between values'),
+                    msg_type='SOZ_0',
+                    patient=patient.id,
+                    electrode=electrode.name
+                    )
                 electrode.soz = electrode.soz or soz_bool(h['soz'])
                 electrode.soz_sc = electrode.soz_sc or soz_bool(h['soz_sc'])
 
-        #HFO_level
-        hfo = HFO(type = decode_type_name(h['type']),
-                  file_block = int(h['file_block']),
-                  duration = float(h['duration']),
-                  intraop = int(h['intraop']),
-                  fr_duration = float(h['fr_duration']),
-                  r_duration = float(h['r_duration']),
-                  freq_av = float(h['freq_av']),
-                  freq_pk = float(h['freq_pk']),
-                  power_av = float(h['power_av']),
-                  power_pk = float(h['power_pk'])
+            if electrode.loc5 is None:
+                electrode.loc5 = loc5
+            elif loc5 != electrode.loc5:
+                log(msg=('Warning, loc5 disagreement among blocks in '
+                         'the same (patient_id, electrode), '
+                         'Priority to Hippocampus'),
+                    msg_type='LOC5',
+                    patient=patient.id,
+                    electrode=electrode.name
+                    )
+                if loc5 == 'Hippocampus':
+                    electrode.loc5 = loc5
+
+        # HFO_level
+        hfo = HFO(type=decode_type_name(h['type']),
+                  file_block=int(h['file_block']),
+                  duration=float(h['duration']),
+                  intraop=int(h['intraop']),
+                  fr_duration=float(h['fr_duration']),
+                  r_duration=float(h['r_duration']),
+                  freq_av=float(h['freq_av']),
+                  freq_pk=float(h['freq_pk']),
+                  power_av=float(h['power_av']),
+                  power_pk=float(h['power_pk'])
                   )
 
         electrode.add(hfo)
     return patients
 
-#Analisis
+
+# Analisis
 def segmentate(patients, train_p=0.6, test_p=0.2, val_p=0.2):
-    assert(1 - train_p - test_p -val_p == 0)
+    assert (1 - train_p - test_p - val_p == 0)
     patient_count = len(patients)
     train_size = int(patient_count * train_p)
     test_size = int(patient_count * test_p)
@@ -233,13 +299,19 @@ def segmentate(patients, train_p=0.6, test_p=0.2, val_p=0.2):
     validation_set = patients[patient_count - validation_size:patient_count]
     return train_set, test_set, validation_set
 
+
 def run_RonO_Model(all_patients):
     # Select all that have any elec in 'Hippocampus'
-    subjects = []
+    subjects = set()
+    assert (len(all_patients) > 0)
+
     for p in all_patients:
         for e in p.electrodes:
             if e.loc5 == 'Hippocampus':
-                subjects.append(p)
+                subjects.add(p)
+
+    assert (len(subjects) > 0)
+    subjects = list(subjects)
 
     feature_list = ['duration', 'freq_pk', 'power_pk',
                     'slow', 'slow_vs', 'slow_angle',
@@ -250,9 +322,9 @@ def run_RonO_Model(all_patients):
     for s in subjects:
         for e in s.electrodes:
             for h in e.hfos:
-                features.append( (h[col_name] for col_name in feature_list) )
+                features.append((h[col_name] for col_name in feature_list))
     print(np.array(features).shape)
-    features = pd.DataFrame(features, columns=feature_list )
+    features = pd.DataFrame(features, columns=feature_list)
     features.describe()
     print('here')
     labels = np.array(features['soz'])
@@ -260,9 +332,9 @@ def run_RonO_Model(all_patients):
     features = np.array(features)
 
     train_features, test_features, train_labels, test_labels = train_test_split(features, labels, test_size=0.3,
-                                                                               random_state=42)
-    #train, test, validation = segmentate(subjects, train=0.6, test=0.2, val=0.2)
-    rf = RandomForestRegressor(n_estimators = 1000, random_state = 42)
+                                                                                random_state=42)
+    # train, test, validation = segmentate(subjects, train=0.6, test=0.2, val=0.2)
+    rf = RandomForestRegressor(n_estimators=1000, random_state=42)
     # Train the model on training data
     rf.fit(train_features, train_labels)
     # Use the forest's predict method on the test data
@@ -272,12 +344,13 @@ def run_RonO_Model(all_patients):
     total = len(test_labels)
     for i in range(predictions):
         if predictions[i] == test_labels[i]:
-            hits+=1
+            hits += 1
 
-    print('Hitrate: {0}'.format(hits/total))
+    print('Hitrate: {0}'.format(hits / total))
 
     # Calculate the absolute errors
     errors = abs(predictions - test_labels)
+
 
 def angle_clusters(collection, amp_step, crit, angle_name):
     angle_grouped = {str(angle_group_id): 0 for angle_group_id in range(mt.floor((2 * np.pi) / amp_step))}
@@ -298,6 +371,8 @@ def angle_clusters(collection, amp_step, crit, angle_name):
     pvalue = float(rayleightest(np.array(angles) * u.rad))  # doctest: +FLOAT_CMP
 
     return angle_grouped, amp_step, mean_angle, pvalue, hfo_count
+
+
 def rose_plot(collection, angle_step=(np.pi / 9)):
     # Usage example
     # rose_plot(collection,angle_step, 'Brodmann area 28')
@@ -305,9 +380,9 @@ def rose_plot(collection, angle_step=(np.pi / 9)):
     loc_name = 'Amygdala'
     angle_type = 'spike'
     criterion = {'$and': [{'type': "5"}, {angle_type: 1}, {'intraop': '0'}, {'soz': '1'}, {'loc5': loc_name}]}
-    count_by_group, step, hfo_count, mean_angle, pvalue  = angle_clusters(collection = collection,
-                                                                          amp_step = angle_step,
-                                                                          crit = criterion)
+    count_by_group, step, hfo_count, mean_angle, pvalue = angle_clusters(collection=collection,
+                                                                         amp_step=angle_step,
+                                                                         crit=criterion)
     angles = []
     values = []
     print('{name}. Count by fase group \n'.format(name=loc_name))
@@ -317,6 +392,8 @@ def rose_plot(collection, angle_step=(np.pi / 9)):
         values.append(v)
 
     polar_bar_plot(angles, values, loc_name=loc_name, mean_angle=mean_angle, pvalue=pvalue, hfo_count=hfo_count)
+
+
 def polar_bar_plot(angles, values, loc_name, mean_angle, pvalue, hfo_count):
     # Data
     theta = angles
@@ -398,7 +475,8 @@ def polar_bar_plot(angles, values, loc_name, mean_angle, pvalue, hfo_count):
     fig.canvas.mpl_connect("motion_notify_event", hover)
     plt.show()
 
-#Results
+
+# Results
 def plot_rocs(oracles, preds, title, legends):
     plt.title('Receiver Operating Characteristic by HFO type.\nHippocampus electrodes.')
     plt.plot([0, 1], [0, 1], 'r--')
@@ -422,13 +500,17 @@ def plot_rocs(oracles, preds, title, legends):
     # df = pd.DataFrame(dict(fpr = fpr, tpr = tpr))
     # ggplot(df, aes(x = 'fpr', y = 'tpr')) + geom_line() + geom_abline(linetype = 'dashed')
 
-#Aux
+
+# Aux
 def soz_bool(db_representation_str):
     return (True if db_representation_str == "1" else False)
+
+
 def save_json(electrodes_info_p):
     import json
     with open("patient_electrode_info.json", "w") as file:
         json.dump(electrodes_info_p, file, indent=4, sort_keys=True)
+
 
 def main():
     db = Database()
@@ -437,11 +519,10 @@ def main():
     hfo_collection = db.HFOs
     electrodes_collection = db.Electrodes
 
-
     unique_patients(hfo_collection, {"$and": [
-                                        {'type': "1"},
-                                        {'loc5': "Hippocampus"}
-                                     ]}
+        {'type': "1"},
+        {'loc5': "Hippocampus"}
+    ]}
                     )
     print('Loading data...')
     electrodes = electrodes_collection.find(filter={},
@@ -450,11 +531,12 @@ def main():
                                                         'file_block',
                                                         'soz',
                                                         'soz_sc',
-                                                        'age'])
+                                                        'age',
+                                                        'loc5'])
     patients_dic = parse_electrodes(electrodes)
 
     target_zone = 'Hippocampus'
-    #Todo 'outcome', 'resected',
+    # Todo 'outcome', 'resected',
     common_attr = ['patient_id', 'age', 'file_block',
                    'electrode', 'soz', 'soz_sc', 'loc5',
                    'type', 'duration', 'intraop',
@@ -463,20 +545,20 @@ def main():
                    'power_av', 'power_pk',
                    ]
 
-    #Loading by type, Data cleaning and reshaping
-    #We have a dictionary of patients
-    #Where each patient has electrodes...
+    # Loading by type, Data cleaning and reshaping
+    # We have a dictionary of patients
+    # Where each patient has electrodes...
 
-    #Type 1
+    # Type 1
     RonO_attributes = ['slow', 'slow_vs', 'slow_angle',
                        'delta', 'delta_vs', 'delta_angle',
                        'theta', 'theta_vs', 'theta_angle',
                        'spindle', 'spindle_vs', 'spindle_angle']
 
-    RonO = load_hfos(source = hfo_collection,
-                     type = encode_type_name('RonO'),
-                     zone = target_zone,
-                     projection = common_attr + RonO_attributes)
+    RonO = load_hfos(source=hfo_collection,
+                     type=encode_type_name('RonO'),
+                     zone=target_zone,
+                     projection=common_attr + RonO_attributes)
     spike_kind = False
     patients_dic = parse_hfos(patients_dic, RonO, spike_kind)
 
@@ -516,15 +598,17 @@ def main():
     Sharp_Spikes_attributes = []
     '''
 
-    #Todo calcular sin y cos de los angulos
+    # Todo calcular sin y cos de los angulos
 
     patients = []
     for id, p in patients_dic.items():
         patients.append(p)
 
     run_RonO_Model(patients)
+
     print(inconsistencies)
-    #Models
+    # Models
+
 
 if __name__ == "__main__":
     main()
