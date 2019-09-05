@@ -176,17 +176,17 @@ def parse_electrodes(electrodes):
             patients[patient.id].add_electrode(electrode)
         else:
             electrode = [e2 for e2 in patients[e['patient_id']].electrodes if e2.name == e['electrode'][0]][0]
-            #Check consistency
-            if (    soz_bool(e['soz']) != electrode.soz or
+            # Check consistency
+            if (soz_bool(e['soz']) != electrode.soz or
                     soz_bool(e['soz_sc']) != electrode.soz_sc):
                 log(
-                    msg=('Warning, soz disagreement among blocks in ' 
-                         'the same (patient_id, electrode), ' 
+                    msg=('Warning, soz disagreement among blocks in '
+                         'the same (patient_id, electrode), '
                          'running OR between values'),
                     msg_type='SOZ_0',
                     patient=e['patient_id'],
                     electrode=e['electrode'][0]
-                    )
+                )
                 electrode.soz = electrode.soz or soz_bool(e['soz'])
                 electrode.soz_sc = electrode.soz_sc or soz_bool(e['soz_sc'])
 
@@ -230,7 +230,7 @@ def parse_hfos(patients, hfo_collection, spike_kind):
         # Electrode level
         electrode = None
         loc5 = h['loc5'] if isinstance(h['loc5'], str) and \
-                            len(h['loc5'])>0 else None
+                            len(h['loc5']) > 0 else None
 
         if not h['electrode'][0] in patient.electrode_names():
             electrode = Electrode(
@@ -242,7 +242,7 @@ def parse_hfos(patients, hfo_collection, spike_kind):
             patient.add_electrode(electrode)
         else:
             electrode = [e for e in patient.electrodes if e.name == h['electrode'][0]][0]
-            #Check consistency
+            # Check consistency
             if (soz_bool(h['soz']) != electrode.soz or
                     soz_bool(h['soz_sc']) != electrode.soz_sc):
                 log(msg=('Warning, soz disagreement among hfos in '
