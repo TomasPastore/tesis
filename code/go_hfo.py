@@ -17,6 +17,7 @@ import sklearn.preprocessing, sklearn.decomposition, \
     sklearn.linear_model, sklearn.pipeline, sklearn.metrics
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import roc_auc_score
 
 hfo_types = ['RonO', 'RonS', 'Spikes', 'Fast RonO', 'Fast RonS', 'Sharp Spikes']
 type_id = {name: (index + 1) for index, name in enumerate(hfo_types)}
@@ -92,21 +93,8 @@ class Electrode():
 
 
 class HFO():
-    def __init__(self, type, file_block, duration, intraop,
-                 fr_duration, r_duration,
-                 freq_av, freq_pk,
-                 power_av, power_pk, ):
-        self.type = type
-        self.type_id = encode_type_name(type)
-        self.file_block = file_block
-        self.duration = duration
-        self.intraop = intraop
-        self.fr_duration = fr_duration
-        self.r_duration = r_duration
-        self.freq_av = freq_av
-        self.freq_pk = freq_pk
-        self.power_av = power_av
-        self.power_pk = power_pk
+    def __init__(self, info):
+        self.info = info
 
 
 # Fast queries
@@ -269,17 +257,38 @@ def parse_hfos(patients, hfo_collection, spike_kind):
                     electrode.loc5 = loc5
 
         # HFO_level
-        hfo = HFO(type=decode_type_name(h['type']),
-                  file_block=int(h['file_block']),
-                  duration=float(h['duration']),
-                  intraop=int(h['intraop']),
-                  fr_duration=float(h['fr_duration']),
-                  r_duration=float(h['r_duration']),
-                  freq_av=float(h['freq_av']),
-                  freq_pk=float(h['freq_pk']),
-                  power_av=float(h['power_av']),
-                  power_pk=float(h['power_pk'])
-                  )
+        info = dict(type=decode_type_name(h['type']),
+                    file_block=int(h['file_block']),
+                    duration=float(h['duration']),
+                    intraop=int(h['intraop']),
+                    fr_duration=float(h['fr_duration']),
+                    r_duration=float(h['r_duration']),
+                    freq_av=float(h['freq_av']),
+                    freq_pk=float(h['freq_pk']),
+                    power_av=float(h['power_av']),
+                    power_pk=float(h['power_pk']),
+                    slow=bool(h['slow']),
+                    slow_vs=None if isinstance(h['slow_vs'], list) \
+                            else float(h['slow_vs']),
+                    slow_angle=None if isinstance(h['slow_angle'], list) \
+                               else float(h['slow_angle']),
+                    delta=bool(h['delta']),
+                    delta_vs=None if isinstance(h['delta_vs'], list) \
+                             else float(h['delta_vs']),
+                    delta_angle=None if isinstance(h['delta_angle'], list) \
+                                else float(h['delta_angle']),
+                    theta=bool(h['theta']),
+                    theta_vs=None if isinstance(h['theta_vs'], list) \
+                             else float(h['theta_vs']),
+                    theta_angle=None if isinstance(h['theta_angle'], list) \
+                                else float(h['theta_angle']),
+                    spindle = bool(h['spindle']),
+                    spindle_vs = None if isinstance(h['spindle_vs'], list) \
+                                 else float(h['spindle_vs']),
+                    spindle_angle = None if isinstance(h['spindle_angle'], list) \
+                                    else float(h['spindle_angle'])
+        )
+        hfo = HFO(info)
 
         electrode.add(hfo)
     return patients
@@ -300,30 +309,81 @@ def segmentate(patients, train_p=0.6, test_p=0.2, val_p=0.2):
     return train_set, test_set, validation_set
 
 
+# patients is a list
+def segmentate_2(patients, train_p=0.6):
+    assert (train_p <= 1 and train_p >= 0)
+    patient_count = len(patients)
+    train_size = int(patient_count * train_p)
+    test_size = int(patient_count * (1 - train_p))
+    train_size += patient_count - (train_size + test_size)
+
+    train_set = patients[:train_size]
+    test_set = patients[train_size:patient_count]
+    return train_set, test_set
+
+
 def run_RonO_Model(all_patients):
     # Select all that have any elec in 'Hippocampus'
-    subjects = set()
-    assert (len(all_patients) > 0)
-
+    patients = set()
     for p in all_patients:
         for e in p.electrodes:
             if e.loc5 == 'Hippocampus':
-                subjects.add(p)
+                patients.add(p)
 
-    assert (len(subjects) > 0)
-    subjects = list(subjects)
+    assert (len(patients) > 0)  # Debug code
+    patients = list(patients)
+    train_patients, test_patients = segmentate_2(patients, train_p=0.6)
+    # hay forma de que cada arbol sea un paciente?
 
-    feature_list = ['duration', 'freq_pk', 'power_pk',
-                    'slow', 'slow_vs', 'slow_angle',
-                    'delta', 'delta_vs', 'delta_angle',
-                    'theta', 'theta_vs', 'theta_angle',
-                    'spindle', 'spindle_vs', 'spindle_angle', 'soz']
-    features = []
-    for s in subjects:
-        for e in s.electrodes:
+    feature_names = ['duration', 'freq_pk', 'power_pk',
+                     'slow', 'slow_vs', 'slow_angle',
+                     'delta', 'delta_vs', 'delta_angle',
+                     'theta', 'theta_vs', 'theta_angle',
+                     'spindle', 'spindle_vs', 'spindle_angle']
+
+    train_features = []
+    train_labels = []
+    for p in train_patients:
+        for e in p.electrodes:
             for h in e.hfos:
-                features.append((h[col_name] for col_name in feature_list))
+                feature_row_i = []
+                for feature_name in feature_names:
+                    feature_i_j = h[feature_name]
+                    feature_row_i.append(feature_i_j)
+                train_features.append(feature_row_i)
+                train_labels.append(h.soz)
+
+    train_features = []
+    train_labels = []
+    for p in train_patients:
+        for e in p.electrodes:
+            for h in e.hfos:
+                feature_row_i = []
+                for feature_name in feature_names:
+                    feature_i_j = h[feature_name]
+                    feature_row_i.append(feature_i_j)
+                train_features.append(feature_row_i)
+                train_labels.append(h.soz)
+
+    test_features = []
+    test_labels = []
+    for p in test_patients:
+        for e in p.electrodes:
+            for h in e.hfos:
+                feature_row_i = []
+                for feature_name in feature_names:
+                    feature_i_j = h[feature_name]
+                    feature_row_i.append(feature_i_j)
+                test_features.append(feature_row_i)
+                test_labels.append(h.soz)
+    '''
+    features = []
+    for p in patients:
+        for e in p.electrodes:
+            for h in e.hfos:
+                features.append([h. for feature in feature_names])
     print(np.array(features).shape)
+
     features = pd.DataFrame(features, columns=feature_list)
     features.describe()
     print('here')
@@ -331,25 +391,36 @@ def run_RonO_Model(all_patients):
     features = features.drop('soz', axis=1)
     features = np.array(features)
 
-    train_features, test_features, train_labels, test_labels = train_test_split(features, labels, test_size=0.3,
-                                                                                random_state=42)
-    # train, test, validation = segmentate(subjects, train=0.6, test=0.2, val=0.2)
+    train_features, test_features, \
+    train_labels, test_labels = train_test_split(features, 
+                                                 labels, 
+                                                 test_size=0.3, 
+                                                 random_state=42)
+    '''
+
     rf = RandomForestRegressor(n_estimators=1000, random_state=42)
     # Train the model on training data
     rf.fit(train_features, train_labels)
     # Use the forest's predict method on the test data
-    predictions = rf.predict(test_features)
+    rf_predictions = rf.predict(test_features)
+    # Probabilities for each class
+    rf_probs = rf.predict_proba(test_features)[:, 1]
+
+    # Calculate roc auc
+    roc_value = roc_auc_score(test_labels, rf_probs)
+    print('Eureka, roc auc of ---> {0}'.format(roc_value))
 
     hits = 0
     total = len(test_labels)
-    for i in range(predictions):
-        if predictions[i] == test_labels[i]:
+    for i in range(rf_predictions):
+        if rf_predictions[i] == test_labels[i]:
             hits += 1
 
     print('Hitrate: {0}'.format(hits / total))
 
     # Calculate the absolute errors
-    errors = abs(predictions - test_labels)
+    errors = abs(rf_predictions - test_labels)
+    print('Abs Error: {0}'.format(errors))
 
 
 def angle_clusters(collection, amp_step, crit, angle_name):
