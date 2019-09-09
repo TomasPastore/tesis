@@ -1,0 +1,33 @@
+
+Connectivity measures were summarized by
+calculating the median value from each electrode to all of the other
+scalp (non-facial) electrodes. Note that, given the spatial distribution of
+the electrodes, this procedure enhances the weight of long-distance
+connections on the computed measure.
+
+Except for event-related potential measures, analyses were per-
+formed on EEG data recorded during the time period when subjects
+were presented with undifferentiated series of tones (from 200 ms
+before the onset of the first tone to the onset of the fifth tone).
+Thus, all trials were pooled independently of the condition of auditory
+stimulation. 
+
+
+Definiciones. Razon ? 
+
+EEG recordings were sampled at 250 Hz with a 256-electrode geodesic
+sensor net (EGI) referenced to the vertex. Recordings were band-pass
+filtered (from 0.2 to 45 Hz)
+
+Trials were then segmented from
+200 ms to + 1336 ms relative to the onset of the first sound. Trials
+with voltages exceeding  150 mV, eye-movements activity exceeding
+80 mV and eye-blinks exceeding  150 mV were rejected.
+
+
+Conceptos 
+local global protocol(Bekinschtein et al., 2009).
+baseline correction
+laplacian transformation
+delta, alpha, beta, theta bands
+support vector machine
