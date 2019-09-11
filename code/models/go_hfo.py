@@ -2,43 +2,40 @@ import pymongo
 
 from preprocessing import soz_bool, get_spike_kind, parse_hfos, encode_type_name
 import models
-from config import HFO_TYPES
+from config import HFO_TYPES, DEBUG
 from utils import inconsistencies, log, unique_patients
 from classes import Database
+from sklearn.preprocessing import StandardScaler
 
 
-def load_patients_with_hfo_types(hfo_collection, type_names):
+def load_patients(hfo_collection, electrodes_collection, hfo_type_names):
 
     # Todo 'outcome', 'resected',
-    common_attr = ['patient_id', 'age', 'file_block',
-                   'electrode', 'soz', 'soz_sc', 'loc5',
-                   'type', 'duration', 'intraop',
-                   'fr_duration', 'r_duration',
-                   'freq_av', 'freq_pk',
-                   'power_av', 'power_pk']
+    common_attr = ['patient_id', 'age', 'file_block', 'electrode', 'loc5', 'soz', 'soz_sc',
+                   'type', 'duration', 'fr_duration', 'r_duration',
+                   'freq_av', 'freq_pk', 'power_av', 'power_pk']
 
-    patients_dic = dict()
-    for type in HFO_TYPES:
-        if type in type_names:
-            spike_kind = get_spike_kind(type)
-            patients_dic = add_patients_by_hfos(patients_dic, hfo_collection, common_attr, spike_kind, hfo_type_name=type )
+    patients_by_hfo_type = {hfo_type_name:dict() for hfo_type_name in HFO_TYPES}
+    for hfo_type_name in hfo_type_names:
+        patients_by_hfo_type[hfo_type_name] = add_patients_by_hfos(patients_by_hfo_type[hfo_type_name],
+                                                                   hfo_collection,
+                                                                   common_attr,
+                                                                   hfo_type_name)
+        patients_by_hfo_type[hfo_type_name] = add_empty_blocks(patients_by_hfo_type[hfo_type_name],
+                                                               electrodes_collection)
 
-    patients = []
-    for id, p in patients_dic.items():
-        patients.append(p)
-
-    return patients
+    return patients_by_hfo_type
 
 
-def add_patients_by_hfos(patients_dic, hfo_collection, common_attr, spike_kind, hfo_type_name):
+def add_patients_by_hfos(patients_of_hfo_type, hfo_collection, common_attr, hfo_type_name):
 
-    if spike_kind:
-        specific_attributes =  ['spike', 'spike_vs', 'spike_angle']
-    else:
+    if hfo_type_name in ['RonO', 'Fast RonO']:
         specific_attributes = ['slow', 'slow_vs', 'slow_angle',
                                'delta', 'delta_vs', 'delta_angle',
                                'theta', 'theta_vs', 'theta_angle',
                                'spindle', 'spindle_vs', 'spindle_angle']
+    else:
+        specific_attributes = ['spike', 'spike_vs', 'spike_angle']
 
     hfo_type = encode_type_name(hfo_type_name)
     hfos_cursor = hfo_collection.find(
@@ -47,22 +44,24 @@ def add_patients_by_hfos(patients_dic, hfo_collection, common_attr, spike_kind, 
         #sort= [('patient_id', pymongo.ASCENDING), ('electrode', pymongo.ASCENDING)]
     )
     #Unifying types and parsing inconsistencies
-    patients_dic = parse_hfos(patients_dic, hfos_cursor, spike_kind)
-    #print('Debug --> After parsing hfos patients have {0}'.format(len(patients_dic.keys())))
-    return patients_dic
+    patients_of_hfo_type = parse_hfos(patients_of_hfo_type, hfos_cursor)
+
+    return patients_of_hfo_type
 
 
 def add_empty_blocks(patients, electrodes_collection):
+    # Nota: esto agrega los bloques sin hfos para los (patient,electrode) que tienen otro bloque de ese electrodo
+    # con hfos en hipocampo, no considera los patient electrodes con loc5 en hipocampo que no tengan ningun hfo
     empty_blocks_added = 0
-    for p in patients:
+    for p in patients.values():
         for e in p.electrodes:
             hfo_empty_blocks = electrodes_collection.find(
                 filter={'patient_id': p.id, "$or": [{'electrode': [e.name]}, {'electrode': e.name}]},
                 projection=['soz', 'file_block']
             )
-            for h in hfo_empty_blocks:
+            for electrode_rec in hfo_empty_blocks:
                 # Consistency for soz
-                soz = soz_bool(h['soz'])
+                soz = soz_bool(electrode_rec['soz'])
                 if (soz != e.soz):
                     log(msg=('Warning, soz disagreement among hfos in '
                              'the same patient_id, electrode, '
@@ -74,7 +73,7 @@ def add_empty_blocks(patients, electrodes_collection):
                     e.soz = e.soz or soz
 
                     # Add block id for hfo_rate
-                    file_block = float(h['file_block'])
+                    file_block = float(electrode_rec['file_block'])
                     if file_block not in p.file_blocks:
                         empty_blocks_added += 1
                     p.file_blocks.add(file_block)
@@ -95,33 +94,33 @@ def main():
     hfo_collection.create_index([('loc5', pymongo.TEXT)], default_language='english')
 
     #Debug line below
-    #unique_patients(hfo_collection, {'type': '1', 'intraop':'0', 'loc5': 'Hippocampus'})
-
+    #There are 4 patients that have electrodes in Hippocampus but register 0 hfos in Hippocampus, we skip them
+    #['IO015io', 'IO005io', 'IO002io', '3452']
+    #with_hfo_in_hip = unique_patients(hfo_collection, {'type': '1', 'intraop':'0', 'loc5': 'Hippocampus'})
+    #with_electrodes_in_hip = unique_patients(electrodes_collection, {'loc5': 'Hippocampus'})
+    #patients_with_electrodes_but_no_hfos = list(set(with_electrodes_in_hip) - set(with_hfo_in_hip))
+    #print(patients_with_electrodes_but_no_hfos)
+    type_names_to_run = ['RonS']
+    print('HFO types to run: {0}'.format(type_names_to_run))
     print('Loading data from database...')
 
-    type_names_to_run = ['RonO']
-    patients = load_patients_with_hfo_types(hfo_collection, type_names_to_run)
-    patients = add_empty_blocks(patients, electrodes_collection)
-    print('Found some inconsistencies while parsing: {0}'.format(inconsistencies))
+    patients_by_hfo_type = load_patients(hfo_collection, electrodes_collection, type_names_to_run)
 
-    total_hfos = 0
-    for p in patients:
-        for e in p.electrodes:
-            for type in e.hfos.keys():
-                total_hfos+= len(e.hfos[type])
-    print('Total hfos after parsing is {0}'.format(total_hfos))
+    if DEBUG:
+        print('Inconsistencies found while parsing: {0}'.format(inconsistencies))
 
-    #Delete, #Debug
-    for p in patients:
-        for p2 in patients:
-            if p == p2:
-                continue
-            if p.id == p2.id:
-                print('Debug: This should be unreachable')
-                assert(False)
-    # Models
-    models.run_RonO_Model(patients)
+    for hfo_type_name in type_names_to_run:
+        patients_dic = patients_by_hfo_type[hfo_type_name]
+        patients = [p for p in patients_dic.values()]
+        models.random_forest(patients, hfo_type_name)
 
+        if DEBUG:
+            total_hfos = 0
+            for p in patients:
+                for e in p.electrodes:
+                    for type in e.hfos.keys():
+                        total_hfos+= len(e.hfos[type])
+            print('Total {0} hfos after parsing is {1}'.format(hfo_type_name, total_hfos))
 
 
 if __name__ == "__main__":

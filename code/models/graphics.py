@@ -133,3 +133,17 @@ def plot_rocs(oracles, preds, title, legends):
     # method II: ggplot
     # df = pd.DataFrame(dict(fpr = fpr, tpr = tpr))
     # ggplot(df, aes(x = 'fpr', y = 'tpr')) + geom_line() + geom_abline(linetype = 'dashed')
+
+def feature_importances(feature_list, importances):
+    # Set the style
+    plt.style.use('fivethirtyeight')
+    # list of x locations for plotting
+    x_values = list(range(len(importances)))
+    # Make a bar chart
+    plt.bar(x_values, importances, orientation='vertical')
+    # Tick labels for x axis
+    plt.xticks(x_values, feature_list, rotation='vertical')
+    # Axis labels and title
+    plt.ylabel('Importance')
+    plt.xlabel('Variable')
+    plt.title('Variable Importances')

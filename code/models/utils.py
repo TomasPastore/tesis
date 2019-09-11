@@ -48,6 +48,7 @@ def unique_patients(collection, crit):
     patient_ids.sort()
     print("Unique patients count: {0}".format(len(patient_ids)))
     print(patient_ids)
+    return patient_ids
 
 
 #TODO update

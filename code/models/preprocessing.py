@@ -20,6 +20,7 @@ def type_ids():
 def get_spike_kind(type_name):
     return False if type_name in ['RonO', 'Fast RonO'] else True
 
+#Todo update or remove
 def parse_electrodes(electrodes):
     patients = dict()
     for e in electrodes:
@@ -91,7 +92,7 @@ def parse_electrodes(electrodes):
     return patients
 
 
-def parse_hfos(patients, hfo_collection, spike_kind):
+def parse_hfos(patients, hfo_collection):
     amount = 0
     for h in hfo_collection:
         amount +=1
@@ -123,6 +124,8 @@ def parse_hfos(patients, hfo_collection, spike_kind):
             e_name = h['electrode'][0] if len(h['electrode']) > 0 else None
         elif isinstance(h['electrode'], str):
             e_name = h['electrode'] if len(h['electrode']) > 0 else None
+        else:
+            raise RuntimeError('Unknown type for electrode name')
 
         if not e_name in patient.electrode_names():
             electrode = Electrode(
@@ -159,43 +162,62 @@ def parse_hfos(patients, hfo_collection, spike_kind):
                     )
                 if loc5 == 'Hippocampus':
                     electrode.loc5 = loc5
+
         # HFO_level
-        info = dict(type=decode_type_name(h['type']),
-                    soz=soz_bool(h['soz']),
-                    file_block=float(h['file_block']),
-                    duration=float(h['duration']),
-                    intraop=float(h['intraop']),
-                    fr_duration=float(h['fr_duration']),
-                    r_duration=float(h['r_duration']),
-                    freq_av=float(h['freq_av']),
-                    freq_pk=float(h['freq_pk']),
-                    power_av=float(h['power_av']),
-                    power_pk=float(h['power_pk']),
-                    slow=float(h['slow']),
-                    slow_vs=0.0 if isinstance(h['slow_vs'], list) \
-                        else float(h['slow_vs']),
-                    slow_angle=0.0 if isinstance(h['slow_angle'], list) \
-                        else float(h['slow_angle']),
-                    delta=float(h['delta']),
-                    delta_vs=0.0 if isinstance(h['delta_vs'], list) \
-                        else float(h['delta_vs']),
-                    delta_angle=0.0 if isinstance(h['delta_angle'], list) \
-                        else float(h['delta_angle']),
-                    theta=float(h['theta']),
-                    theta_vs=0.0 if isinstance(h['theta_vs'], list) \
-                        else float(h['theta_vs']),
-                    theta_angle=0.0 if isinstance(h['theta_angle'], list) \
-                        else float(h['theta_angle']),
-                    spindle=float(h['spindle']),
-                    spindle_vs=0.0 if isinstance(h['spindle_vs'], list) \
-                        else float(h['spindle_vs']),
-                    spindle_angle=0.0 if isinstance(h['spindle_angle'], list) \
-                        else float(h['spindle_angle'])
-        )
+
+        if decode_type_name(h['type']) in ['RonO', 'Fast RonO']:
+            info = dict(
+                type=decode_type_name(h['type']),
+                file_block=int(h['file_block']),
+                duration=float(h['duration']),
+                fr_duration=float(h['fr_duration']),
+                r_duration=float(h['r_duration']),
+                freq_av=float(h['freq_av']),
+                freq_pk=float(h['freq_pk']),
+                power_av=float(h['power_av']),
+                power_pk=float(h['power_pk']),
+                slow=bool(h['slow']),
+                slow_vs=0.0 if isinstance(h['slow_vs'], list) \
+                    else float(h['slow_vs']),
+                slow_angle=0.0 if isinstance(h['slow_angle'], list) \
+                    else float(h['slow_angle']),
+                delta=bool(h['delta']),
+                delta_vs=0.0 if isinstance(h['delta_vs'], list) \
+                    else float(h['delta_vs']),
+                delta_angle=0.0 if isinstance(h['delta_angle'], list) \
+                    else float(h['delta_angle']),
+                theta=bool(h['theta']),
+                theta_vs=0.0 if isinstance(h['theta_vs'], list) \
+                    else float(h['theta_vs']),
+                theta_angle=0.0 if isinstance(h['theta_angle'], list) \
+                    else float(h['theta_angle']),
+                spindle=bool(h['spindle']),
+                spindle_vs=0.0 if isinstance(h['spindle_vs'], list) \
+                    else float(h['spindle_vs']),
+                spindle_angle=0.0 if isinstance(h['spindle_angle'], list) \
+                    else float(h['spindle_angle'])
+            )
+        else:
+            info = dict(
+                type=decode_type_name(h['type']),
+                file_block=int(h['file_block']),
+                duration=float(h['duration']),
+                fr_duration=float(h['fr_duration']),
+                r_duration=float(h['r_duration']),
+                freq_av=float(h['freq_av']),
+                freq_pk=float(h['freq_pk']),
+                power_av=float(h['power_av']),
+                power_pk=float(h['power_pk']),
+                spike=bool(h['spike']),
+                spike_vs=0.0 if isinstance(h['spike_vs'], list) \
+                    else float(h['spike_vs']),
+                spike_angle=0.0 if isinstance(h['spike_angle'], list) \
+                    else float(h['spike_angle'])
+            )
+
         hfo = HFO(info)
         electrode.add(hfo)
+
     print('{0} hfos parsed.'.format(amount))
-    #print('Printing patients after parsing')
-    #for k, p in patients.items():
-    #    p.print()
+
     return patients
