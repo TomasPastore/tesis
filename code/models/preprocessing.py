@@ -1,6 +1,8 @@
+import copy
+
 from classes import Patient, Electrode, HFO
 from utils import log
-from config import HFO_TYPES
+from config import HFO_TYPES, models_to_run
 
 def soz_bool(db_representation_str):
     return (True if db_representation_str == "1" else False)
@@ -20,66 +22,75 @@ def type_ids():
 def get_spike_kind(type_name):
     return False if type_name in ['RonO', 'Fast RonO'] else True
 
-#Todo update or remove
-def parse_electrodes(electrodes):
-    patients = dict()
-    for e in electrodes:
+PATIENTS_INIT = None
+def parse_electrodes(patients, elec_cursor):
+
+    if PATIENTS_INIT is None:
+        parse_electrodes_mem(patients, elec_cursor, PATIENTS_INIT)
+    else:
+        patients = copy.deepcopy(PATIENTS_INIT)
+
+
+def parse_electrodes_mem(patients, elec_cursor, PATIENTS_INIT):
+    for e in elec_cursor:
         # Patient level
         if not e['patient_id'] in patients.keys():
             patient = Patient(
                 id=e['patient_id'],
                 age=0.0 if e['age'] == "empty" else float(e['age']),
-                file_blocks={float(e['file_block'])}
+                file_blocks={int(e['file_block']): None},
             )
             patients[e['patient_id']] = patient
         else:
-            # Check patient consistency
             patient = patients[e['patient_id']]
+            # Check consistency of patient attributes
             age = 0.0 if e['age'] == "empty" else float(e['age'])
             if age != patient.age:
-                print('Warning, age should be consistent' \
-                      ' between blocks of the same patient')
+                log('Warning, age should be consistent' \
+                    ' between blocks of the same patient')
                 if age is not None:
                     patient.age = age
-            patient.file_blocks.add(float(e['file_block']))
+            if int(e['file_block']) not in patient.file_blocks.keys():
+                patient.file_blocks[int(e['file_block']) ] = None
 
         # Electrode level
-        if isinstance(e['loc5'], str):
-            loc5 = e['loc5']
-        elif isinstance(e['loc5'], list):
-            loc5 = None if len(e['loc5']) == 0 else e['loc5'][0]
+
+        loc5 = e['loc5'] if isinstance(e['loc5'], str) and \
+                            len(e['loc5']) > 0 else None
+
+        if isinstance(e['electrode'], list):
+            e_name = e['electrode'][0] if len(e['electrode']) > 0 else None
+        elif isinstance(e['electrode'], str):
+            e_name = e['electrode'] if len(e['electrode']) > 0 else None
         else:
-            raise NotImplementedError('Unknown loc5 type in parse electrodes')
+            raise RuntimeError('Unknown type for electrode name')
 
-        assert (isinstance(e['electrode'], list))
-
-        if not e['electrode'][0] in patient.electrode_names():
+        if not e_name in patient.electrode_names():
             electrode = Electrode(
-                e['electrode'][0],
+                e_name,
                 soz_bool(e['soz']),
                 soz_bool(e['soz_sc']),
                 loc5=loc5
             )
-            patients[patient.id].add_electrode(electrode)
+            patient.add_electrode(electrode)
         else:
-            electrode = next(e2 for e2 in patients[e['patient_id']].electrodes if e2.name == e['electrode'][0])
+            electrode = next(e2 for e2 in patient.electrodes if e2.name == e_name)
             # Check consistency
             if (soz_bool(e['soz']) != electrode.soz or
                     soz_bool(e['soz_sc']) != electrode.soz_sc):
-                log(
-                    msg=('Warning, soz disagreement among blocks in '
-                         'the same (patient_id, electrode), '
+                log(msg=('Warning, soz disagreement amon '
+                         'the same patient_id, electrode, '
                          'running OR between values'),
-                    msg_type='SOZ_0',
-                    patient=e['patient_id'],
-                    electrode=e['electrode'][0]
-                )
+                    msg_type='SOZ_1',
+                    patient=patient.id,
+                    electrode=electrode.name
+                    )
                 electrode.soz = electrode.soz or soz_bool(e['soz'])
                 electrode.soz_sc = electrode.soz_sc or soz_bool(e['soz_sc'])
 
             if electrode.loc5 is None:
                 electrode.loc5 = loc5
-            elif loc5 is not None and loc5 != electrode.loc5:
+            elif loc5 != electrode.loc5:
                 log(msg=('Warning, loc5 disagreement among blocks in '
                          'the same (patient_id, electrode), '
                          'Priority to Hippocampus'),
@@ -89,19 +100,23 @@ def parse_electrodes(electrodes):
                     )
                 if loc5 == 'Hippocampus':
                     electrode.loc5 = loc5
-    return patients
+
+    PATIENTS_INIT = copy.deepcopy(patients)
 
 
 def parse_hfos(patients, hfo_collection):
     amount = 0
     for h in hfo_collection:
         amount +=1
+        file_block = int(h['file_block'])
+        block_duration = float(h['r_duration'])
+
         # Patient level
         if h['patient_id'] not in patients.keys():
             patient = Patient(
                 id=h['patient_id'],
                 age=0.0 if h['age'] == "empty" else float(h['age']),
-                file_blocks={float(h['file_block'])},
+                file_blocks={file_block:block_duration},
             )
             patients[patient.id] = patient
         else:
@@ -113,7 +128,13 @@ def parse_hfos(patients, hfo_collection):
                     ' between blocks of the same patient')
                 if age is not None:
                     patient.age = age
-            patient.file_blocks.add(float(h['file_block']))
+
+            if file_block not in patient.file_blocks.keys() or patient.file_blocks[file_block] is None:
+                patient.file_blocks[file_block] = block_duration
+            else:
+                if block_duration != patient.file_blocks[file_block]:
+                    #TODO log inconsistence
+                    patient.file_blocks[file_block] = (patient.file_blocks[file_block] + block_duration) / 2
 
         # Electrode level
 
@@ -167,6 +188,9 @@ def parse_hfos(patients, hfo_collection):
 
         if decode_type_name(h['type']) in ['RonO', 'Fast RonO']:
             info = dict(
+                prediction={m:[0, 0] for m in models_to_run},
+                proba={m:0 for m in models_to_run},
+                soz= soz_bool(h['soz']),
                 type=decode_type_name(h['type']),
                 file_block=int(h['file_block']),
                 duration=float(h['duration']),
@@ -199,6 +223,9 @@ def parse_hfos(patients, hfo_collection):
             )
         else:
             info = dict(
+                prediction={m: [0, 0] for m in models_to_run},
+                proba={m: 0 for m in models_to_run},
+                soz=soz_bool(h['soz']),
                 type=decode_type_name(h['type']),
                 file_block=int(h['file_block']),
                 duration=float(h['duration']),

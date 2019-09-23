@@ -11,13 +11,17 @@ def print_auc_0(labels, rates):
     print( 'AUC --> {0}'.format(auc(fpr, tpr)))
 
 
-def print_metrics(y_test, y_pred, y_probs):
-    print('Displaying metrics:')
-    print('Accuracy: {0}'.format( accuracy_score(y_test, y_pred)))
+def print_metrics(y_test, y_pred, y_probs, hfo_type_name, model):
+    print('')
+    print('-------------------------------------------')
+    print('Displaying metrics for {0} using {1} model:'.format(hfo_type_name, model))
     print('ROC AUC of ---> {0}'.format(roc_auc_score(y_test, y_probs)))
+    print('Accuracy: {0}'.format( accuracy_score(y_test, y_pred)))
     print('Confusion matrix')
     print(confusion_matrix(y_test, y_pred))
     print(classification_report(y_test, y_pred))
+    print('-------------------------------------------')
+    print('')
 
 def generate_trees(feature_list, train_features, train_labels,
                    amount=1, directory='/home/{user}'.format(user=getpass.getuser())):
@@ -39,7 +43,7 @@ def generate_trees(feature_list, train_features, train_labels,
 
 
 
-def print_feature_importances(model, feature_names):
+def print_feature_importances(model, feature_namblock_durationes):
     # Extract feature importances
     fi = pd.DataFrame({'feature': feature_names,
                        'importance': model.feature_importances_}). \

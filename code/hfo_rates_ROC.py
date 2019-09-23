@@ -72,6 +72,12 @@ def get_electrodes_data(electrodes_collection, hfo_collection, hfo_type):
         patients[patient_id][electrode_name]= dict()
         patients[patient_id][electrode_name][file_block] = ElectrodeInfo(0, None, soz)
 
+        #Contar electrodos
+    electrodes_count = 0 
+    for pid, p_electrodes in patients.items():
+        electrodes_count += len(p_electrodes)            
+
+
     for h in hfos:
         patient_id = h['patient_id']
         electrode_name =  h['electrode'][0]

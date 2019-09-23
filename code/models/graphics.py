@@ -111,8 +111,26 @@ def polar_bar_plot(angles, values, loc_name, mean_angle, pvalue, hfo_count):
 
 
 # Results
-def plot_rocs(oracles, preds, title, legends):
-    plt.title('Receiver Operating Characteristic by HFO type.\nHippocampus electrodes.')
+ROC_TITLE = 'Receiver Operating Characteristic.\nHippocampus electrodes.'
+def plot_roc(labels, preds, legend, title=ROC_TITLE):
+    plt.title(title)
+    plt.plot([0, 1], [0, 1], 'r--')
+    plt.xlim([0, 1])
+    plt.ylim([0, 1])
+    plt.ylabel('True Positive Rate')
+    plt.xlabel('False Positive Rate')
+
+    fpr, tpr, threshold = metrics.roc_curve(labels, preds)
+    roc_auc = metrics.auc(fpr, tpr)
+    plt.plot(fpr, tpr, 'b', label=legend + ' AUC = %0.2f' % roc_auc)
+
+    plt.legend(loc='lower right')
+    plt.show()
+
+
+ROCS_TITLE = 'Receiver Operating Characteristic by HFO type.\nHippocampus electrodes.'
+def plot_rocs(labels, preds, legends, title=ROCS_TITLE):
+    plt.title(title)
     plt.plot([0, 1], [0, 1], 'r--')
     plt.xlim([0, 1])
     plt.ylim([0, 1])
@@ -122,8 +140,8 @@ def plot_rocs(oracles, preds, title, legends):
     colors = ['b', 'g', 'c', 'm', 'y', 'k']
 
     # calculate the fpr and tpr for all thresholds of the classification
-    for i in range(len(oracles)):
-        fpr, tpr, threshold = metrics.roc_curve(oracles[i], preds[i])
+    for i in range(len(labels)):
+        fpr, tpr, threshold = metrics.roc_curve(labels[i], preds[i])
         roc_auc = metrics.auc(fpr, tpr)
         plt.plot(fpr, tpr, colors[i], label=legends[i] + ' AUC = %0.2f' % roc_auc)
 

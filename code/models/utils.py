@@ -40,9 +40,9 @@ def unique_patients(collection, crit):
     # Usage example
     # unique_crit = {'$and': [{'intraop': '0'}, {'loc5': 'Brodmann area 21'}]}
     # unique_patients(hfo_collection, unique_crit)
-    hfos_in_zone = collection.find(crit)
+    cursor = collection.find(crit)
     docs = set()
-    for doc in hfos_in_zone:
+    for doc in cursor:
         docs.add(doc['patient_id'])
     patient_ids = list(docs)
     patient_ids.sort()
