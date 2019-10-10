@@ -2,15 +2,25 @@
   <dictionary name="tpastore">
     <words>
       <w>aucs</w>
+      <w>brodmann</w>
       <w>despues</w>
+      <w>elec</w>
       <w>hfos</w>
       <w>hippocampus</w>
       <w>hitrate</w>
+      <w>idxs</w>
       <w>intraop</w>
+      <w>limbic</w>
+      <w>locs</w>
+      <w>pewh</w>
+      <w>phfos</w>
       <w>preds</w>
       <w>proba</w>
       <w>probs</w>
+      <w>pvalue</w>
+      <w>resample</w>
       <w>resected</w>
+      <w>tpastore</w>
       <w>tprs</w>
     </words>
   </dictionary>
