@@ -75,16 +75,32 @@ def electrode_pat_vs_hfo_pat(electrodes_collection, hfo_collection, loc_filter, 
 
     return only_electrodes, only_hfos
 
+def parse_elec_name(doc):
+    if isinstance(doc['electrode'], list):
+        e_name = doc['electrode'][0] if len(doc['electrode']) > 0 else None
+    elif isinstance(doc['electrode'], str):
+        e_name = doc['electrode'] if len(doc['electrode']) > 0 else None
+    else:
+        raise RuntimeError('Unknown type for electrode name')
+    return e_name
+
 def angle_clusters(collection, hfo_filter, angle_field_name, amp_step):
     angle_grouped = {str(angle_group_id): 0 for angle_group_id in range(mt.floor((2 * np.pi) / amp_step))}
     docs = collection.find(hfo_filter)
     hfo_count = docs.count()
     angles = []
+    pat_elec = dict()
     for doc in docs:
         angle = doc[angle_field_name] % (2 * np.pi)  # Normalizing to 0 -- 2 pi
         angles.append(angle)
         angle_group_id = mt.floor(angle / amp_step)
         angle_grouped[str(angle_group_id)] += 1  # increment count of group
+
+        pat_id = doc['patient_id']
+        e_name = parse_elec_name(doc)
+        if pat_id not in pat_elec.keys():
+            pat_elec[pat_id] = set()
+        pat_elec[pat_id].add(e_name)
 
     for k, v in angle_grouped.items():  # normalizing values
         r_value = round((v / hfo_count) * 100, 2)  # show them as relative percentages
@@ -92,7 +108,44 @@ def angle_clusters(collection, hfo_filter, angle_field_name, amp_step):
 
     mean_angle = mt.degrees(circmean(angles))
     pvalue = float(rayleightest(np.array(angles) * u.rad))  # doctest: +FLOAT_CMP
-    hfo_count_2 = sum([v for v in angle_grouped.values()]) #Todo extract
-    assert(hfo_count == hfo_count)
-    return angle_grouped, mean_angle, pvalue, hfo_count
 
+    elec_count = sum([len(elec_set) for elec_set in pat_elec.values()])
+
+    return angle_grouped, mean_angle, pvalue, hfo_count, elec_count
+
+def map_string_to_num(string):
+    return int(''.join([ str(ord(l)) for l in string]))
+
+'''
+#Creo que se puede remover porque esta en 'elec_with_pevents' de rate_data, restringir tipo y region.
+def percentage_of_elec_with_pRonS():
+    hfo_type_name = 'RonS'
+    loc_granularity = 0
+    locations = 'all'
+    intraop = False
+    loc, locations = parse_locations(loc_granularity, locations)
+    encoded_intraop = str(int(intraop))
+    patient_id_intraop_cond = {'$nin': non_intraop_patients if intraop else intraop_patients}
+
+
+    elec_filter, hfo_filter = query_filters(patient_id_intraop_cond, encoded_intraop, hfo_type_name, loc, 'all brain')
+    elec_cursor = electrodes_collection.find(elec_filter, projection=electrodes_query_fields)
+    hfo_cursor = hfo_collection.find(hfo_filter, projection=hfo_query_fields)
+    patients_dic = parse_patients(elec_cursor, hfo_cursor)
+
+    soz_electrodes = 0
+    with_p_rons = 0
+    for pid, p in patients_dic.items():
+        for e in p.electrodes:
+            if e.soz:
+                 soz_electrodes += 1
+            with_p_rons_flag = False
+            for h in e.hfos[hfo_type_name]:
+                if h.info['soz']:
+                    with_p_rons_flag = True
+                    break
+            if with_p_rons_flag:
+                with_p_rons +=1
+    print('Percentage of SOZ electrodes with Pathological RonS: {0}'.format(with_p_rons/soz_electrodes))
+
+'''

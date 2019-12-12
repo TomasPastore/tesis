@@ -1,15 +1,19 @@
 DEBUG = True
-HFO_TYPES = ['RonO', 'RonS', 'Spikes', 'Fast RonO', 'Fast RonS', 'Sharp Spikes']
-type_names_to_run = ['RonS']
+EVENT_TYPES = ['RonO', 'RonS', 'Spikes', 'Fast RonO', 'Fast RonS', 'Sharp Spikes']
+HFO_TYPES = ['RonO', 'RonS', 'Fast RonO', 'Fast RonS']
+HFO_SUBTYPES = ['slow', 'delta', 'theta', 'spindle', 'spike']
+
+#type_names_to_run =  ['RonO', 'RonS', 'Fast RonO', 'Fast RonS']
+type_names_to_run =  ['RonS']
 
 from models import naive_bayes, random_forest, svm_m, balanced_random_forest, xgboost, sgd
 
-models_to_run = ['Balanced RF', 'XGBoost']
-models_to_run_obj = [balanced_random_forest, xgboost]
+models_to_run = ['XGBoost'] #'xgboost'
+models_to_run_obj = [xgboost]
 
 electrodes_query_fields = ['patient_id', 'age', 'file_block', 'electrode',
                            'loc1', 'loc2', 'loc3', 'loc4', 'loc5',
-                           'soz', 'soz_sc']
+                           'soz', 'soz_sc', 'x', 'y', 'z', 'age']
 
 hfo_query_fields = ['patient_id', 'age', 'file_block', 'electrode',
                     'loc1', 'loc2', 'loc3', 'loc4', 'loc5', 'type', 'soz', 'soz_sc',
@@ -19,7 +23,7 @@ hfo_query_fields = ['patient_id', 'age', 'file_block', 'electrode',
                     'delta', 'delta_vs', 'delta_angle',
                     'theta', 'theta_vs', 'theta_angle',
                     'spindle', 'spindle_vs', 'spindle_angle',
-                    'spike', 'spike_vs', 'spike_angle']
+                    'spike', 'spike_vs', 'spike_angle', 'x', 'y', 'z']
 
 all_patient_names = ['2061', '3162', '3444', '3452', '3656', '3748', '3759', '3799', '3853', '3900', '3910', '3943',
                      '3967', '3997', '4002', '4009', '4013', '4017', '4028', '4036', '4041', '4047', '4048', '4050',
@@ -45,3 +49,4 @@ non_intraop_patients = ['2061', '3162', '3444', '3452', '3656', '3748', '3759', 
                         '473', '474', '475', '477', '478', '479', '480', '481', '729', '831', 'IO001', 'IO002', 'IO004',
                         'IO005', 'IO006', 'IO008', 'IO009', 'IO010', 'IO012', 'IO013', 'IO014', 'IO015', 'IO017',
                         'IO018', 'IO019', 'IO021', 'IO022', 'IO023', 'IO024', 'IO025', 'IO027']
+

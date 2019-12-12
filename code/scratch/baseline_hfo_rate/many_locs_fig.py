@@ -70,8 +70,8 @@ def get_electrodes_data(electrodes_collection, hfo_collection, hfo_type, target_
         patient_intraop_cond = { '$nin': intraop_patients }
         intraop_str = '0'
     
-    electrodes_filter ={'loc5':target_loc, 'patient_id': patient_intraop_cond} 
-    hfo_filter = { 'loc5':target_loc, 'type': hfo_type, 'intraop':intraop_str, 'patient_id':patient_intraop_cond}
+    electrodes_filter ={'loc2':target_loc, 'patient_id': patient_intraop_cond} 
+    hfo_filter = { 'loc2':target_loc, 'type': hfo_type, 'intraop':intraop_str, 'patient_id':patient_intraop_cond}
    
 
     electrodes = electrodes_collection.find(filter = electrodes_filter,
@@ -86,7 +86,6 @@ def get_electrodes_data(electrodes_collection, hfo_collection, hfo_type, target_
 
     #Initialize structures
     patients = dict()
-    max_block = dict()
 
     for e in electrodes:
         patient_id = e['patient_id']
@@ -94,9 +93,6 @@ def get_electrodes_data(electrodes_collection, hfo_collection, hfo_type, target_
         file_block = int(e['file_block'])
         soz = soz_bool(e['soz'])
         
-        if patient_id not in max_block.keys() or max_block[patient_id] < file_block:
-            max_block[patient_id] = file_block
-
         if patient_id not in patients.keys():
             patients[patient_id] = dict()
         if electrode_name not in patients[patient_id].keys():
@@ -113,9 +109,6 @@ def get_electrodes_data(electrodes_collection, hfo_collection, hfo_type, target_
         file_block = int(h['file_block'])
         block_duration = float(h['r_duration'])
         soz = soz_bool(h['soz'])
-
-        if patient_id not in max_block.keys() or max_block[patient_id] < file_block:
-            max_block[patient_id] = file_block
 
         if patient_id not in patients.keys():
             patients[patient_id] = dict()
@@ -137,21 +130,6 @@ def get_electrodes_data(electrodes_collection, hfo_collection, hfo_type, target_
 
             patients[patient_id][electrode_name][file_block].soz = patients[patient_id][electrode_name][file_block].soz or soz
 
-    #add empty blocks
-
-    added_blocks = 0
-    added_pat_blocks = []
-    for patient_id, p_electrodes in patients.items():
-        for elec_name, blocks in p_electrodes.items():
-            for i in range(1, max_block[patient_id]+1):
-                    fb = i
-                    if fb not in blocks.keys():
-                        blocks[fb] = ElectrodeInfo(0, None, False)
-                        block_id = patient_id+'_'+str(fb)
-                        if block_id not in added_pat_blocks:
-                            added_blocks +=1
-                            added_pat_blocks.append(block_id)
-    #print(sorted(added_pat_blocks))
     soz_array_all = []
     hfo_rates_all = []
     electrodes_count = 0 
@@ -198,12 +176,11 @@ def main():
     fig = plt.figure()
     fig.suptitle('HFO Rate by location (events per minute). Non-intraop electrodes.', fontsize=16)
                                   
-    #locations = ['Parietal Lobe', 'Temporal Lobe', 'Frontal Lobe', 
-    #             'Occipital Lobe', 'Posterior Lobe', 'Anterior Lobe', 
-    #             'Sub-lobar', 'Limbic Lobe']
+    locations = ['Parietal Lobe', 'Temporal Lobe', 'Frontal Lobe', 
+                 'Occipital Lobe', 'Limbic Lobe']
 
-    locations = ['Hippocampus', 'Amygdala', 'Brodmann area 21', 'Brodmann area 27', 'Brodmann area 28',
-                'Brodmann area 34', 'Brodmann area 35', 'Brodmann area 36', 'Brodmann area 37']
+    #locations = ['Hippocampus', 'Amygdala', 'Brodmann area 21', 'Brodmann area 27', 'Brodmann area 28',
+    #            'Brodmann area 34', 'Brodmann area 35', 'Brodmann area 36', 'Brodmann area 37']
 
     l = 0
     plot_axe = dict()

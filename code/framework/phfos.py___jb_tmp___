@@ -1,0 +1,426 @@
+import copy
+import getpass
+import itertools
+import math as mt
+import random
+
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+from imblearn.combine import SMOTETomek  # doctest: +NORMALIZE_WHITESPACE
+from scipy import interp
+from sklearn.metrics import roc_curve, auc
+from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import RobustScaler
+
+from config import models_to_run, models_to_run_obj, HFO_TYPES
+from metrics import print_metrics
+from models import xgboost
+from utils import map_string_to_num
+
+
+def patients_with_hfos(patients_dic, hfo_type_name):
+    with_hfos = dict()
+    without_hfos = dict()
+    for p_name, p in patients_dic.items():
+        if any([True if len(e.hfos[hfo_type_name]) > 0 else False for e in p.electrodes]):
+            with_hfos[p_name] = p
+        else:
+            without_hfos[p_name] = p
+
+    return with_hfos, without_hfos
+
+
+def ml_field_names(hfo_type_name):
+    if hfo_type_name in ['RonO', 'Fast RonO']:
+        field_names = ['age', 'duration', 'freq_av', 'freq_pk', 'power_av', 'power_pk',
+                       'slow_vs', 'slow_angle',
+                       'delta_vs', 'delta_angle',
+                       'theta_vs', 'theta_angle',
+                       'spindle_vs', 'spindle_angle']  # 'slow', 'delta','theta', 'spindle',
+    else:
+        field_names = ['duration', 'power_av', 'freq_av', 'freq_pk', 'power_pk',
+                       'spike_angle', 'spike_vs',]  #'type_rate' 'age', 'spike', 'x', 'y', 'z'
+
+    return field_names
+
+
+def get_balanced_partition(patients, hfo_type_name, K=4, method='deterministic'):
+    count_by_pat = []
+    for p in patients:
+        count_by_pat.append((p.id, sum([len(e.hfos[hfo_type_name]) for e in p.electrodes])))
+    # count_by_pat is a [(pat_name, hfo_count)]
+    count_by_pat.sort(key=lambda tup: tup[1])
+    ordered_names = [name for name, h_count in count_by_pat]
+    partition_hfos = [0 for _ in range(K)]
+    partition_names = [[] for _ in range(K)]
+
+    print('Total hfo count: {0}'.format(sum([t[1] for t in count_by_pat])))
+    print('Mean hfo count per patient: {0}'.format(np.mean([t[1] for t in count_by_pat])))
+    print('Standard deviation: {0}'.format(np.std([t[1] for t in count_by_pat])))
+    print('Values {0}'.format(count_by_pat))
+
+    if method == 'random':
+        random.shuffle(count_by_pat)
+        for name, count in count_by_pat:
+            best_place = 0
+            for candidate_group_idx in range(K):
+                current_groups = copy.deepcopy(partition_hfos)
+                current_groups[best_place] += count
+                candidate_groups = copy.deepcopy(partition_hfos)
+                candidate_groups[candidate_group_idx] += count
+                if np.std(candidate_groups) < np.std(current_groups):
+                    best_place = candidate_group_idx
+
+            partition_hfos[best_place] += count
+            partition_names[best_place].append(name)
+    elif method == 'deterministic':
+        # Add patients at the end with 0 count to have a multiple of K, then I remove them
+        fake_patients = len(count_by_pat) % K
+        for f in range(fake_patients):
+            count_by_pat.append(('fake', 0))
+
+        for i in range(len(count_by_pat) // K):
+            s_assert = sum(partition_hfos)
+            k_candidates = count_by_pat[i * K: (i + 1) * K]
+            rel_idxs = [idx for idx in range(K)]
+            permutations = itertools.permutations(rel_idxs)
+            best_permutation = rel_idxs
+            for p in permutations:
+                current_groups = [partition_hfos[k] + k_candidates[best_permutation[k]][1] for k in range(K)]
+                candidate_groups = [partition_hfos[k] + k_candidates[p[k]][1] for k in range(K)]
+                if np.std(candidate_groups) < np.std(current_groups):
+                    best_permutation = p
+
+            assert (sum(partition_hfos) == s_assert)
+            for k in range(K):
+                partition_names[k].append(k_candidates[best_permutation[k]][0])
+                partition_hfos[k] += k_candidates[best_permutation[k]][1]
+
+        for p in partition_names:
+            try:
+                p.remove('fake')
+            except ValueError:
+                pass
+    else:
+        raise RuntimeError('Unknown partitioning method name')
+
+    print('Partition Std analysis...')
+    print('Groups hfo count: {0}'.format(partition_hfos))
+    print('Standard deviation among groups: {0}'.format(np.std(partition_hfos)))
+    print('Mean hfo count per group: {0}'.format(np.mean(partition_hfos)))
+    print('Indexes by group...')
+    for k in range(K):
+        print('\t Group {k}: {idxs}'.format(k=k, idxs=[ordered_names.index(name) for name in partition_names[k]]))
+
+    return partition_names
+
+
+def pull_apart_validation_set(patients_dic, hfo_type_name):
+    patients = [p for p in patients_dic.values()]
+    partition_names = get_balanced_partition(patients, hfo_type_name, K=4, method='deterministic')
+    print('Validation names {0}'.format(partition_names[0]))
+    validation_patients = [patients_dic[name] for name in partition_names[0]]
+    model_patients = [p for p_name, p in patients_dic.items() if p_name not in partition_names[0]]
+    return model_patients, validation_patients
+
+
+def add_hfo_rate_prop(patients_dic, hfo_type_name):
+    for p in patients_dic.values():
+        for e in p.electrodes:
+            rate = e.get_hfo_rate(hfo_type_name)  # Measured in events/min
+            for h in e.hfos[hfo_type_name]:
+                h.info['hfo_rate'] = rate[0]
+
+def add_phfo_rate_prop(patients_dic, hfo_type_name):
+    for p in patients_dic.values():
+        for e in p.electrodes:
+            rate = e.get_phfo_rate(hfo_type_name)  # Measured in events/min
+            for h in e.hfos[hfo_type_name]:
+                h.info['phfo_rate'] = rate[0]
+
+
+def get_features_and_labels(patients, hfo_type_name, field_names):
+    features = []
+    labels = []
+    for p in patients:
+        for e in p.electrodes:
+            for h in e.hfos[hfo_type_name]:
+                feature_row_i = {}
+                for feature_name in field_names:
+                    if 'angle' in feature_name or 'vs' in feature_name:
+                        feature_row_i['SIN({0})'.format(feature_name)] = mt.sin(h.info[feature_name])
+                        feature_row_i['COS({0})'.format(feature_name)] = mt.cos(h.info[feature_name])
+                    else:
+                        feature_row_i[feature_name] = h.info[feature_name]
+
+                features.append(feature_row_i)
+                labels.append(h.info['soz'])
+
+    return features, np.array(labels)  # returns dict, np.array, list
+
+
+def encode_locations(train_features_pd, test_features_pd, loc_names=['loc1', 'loc2', 'loc3', 'loc4', 'loc5']):
+    merged_pd = pd.concat([train_features_pd, test_features_pd], axis=0)
+    locations = pd.get_dummies(merged_pd, columns=loc_names)
+    for name in loc_names:
+        locations = locations.drop(['{loc}_empty'.format(loc=name)], axis=1)
+        merged_pd = merged_pd.drop(['{loc}'.format(loc=name)], axis=1)
+
+    merged_pd = pd.concat([merged_pd, locations], axis=1)
+    train_features_pd = merged_pd[:len(train_features_pd)]
+    test_features_pd = merged_pd[len(train_features_pd):]
+
+    return train_features_pd, test_features_pd
+
+
+def balance_samples(features, labels):
+    prev_count = len(features)
+    print('Original train hfo count : {0}'.format(prev_count))
+    print('Performing resample with SMOTETomek...')
+    smt = SMOTETomek(sampling_strategy='auto', random_state=42, n_jobs=4)
+    features, labels = smt.fit_resample(features, labels)
+    post_count = len(features)
+    print('Post hfo count : {0}'.format(post_count))
+    print('Added {0} instances to balance classes...'.format(post_count - prev_count))
+    return features, labels
+
+
+def get_feature(i, j, features, name):
+    if 'SIN' in name:
+        return name[4:-1], mt.asin(features[i][j])  # removes 'SIN()'
+    elif 'COS' in name:
+        return name[4:-1], mt.acos(features[i][j])  # removes 'COS()'
+    else:
+        return name, features[i][j]
+
+
+def save_prediction(clf_preds, clf_probs, patients, test_pat_idx, test_labels, hfo_type_name, model):
+    i = 0
+    for t in test_pat_idx:
+        for e in patients[t].electrodes:
+            for h in e.hfos[hfo_type_name]:
+                assert(h.info['prediction'][model] == 0)
+                h.info['prediction'][model] = int(clf_preds[i])
+                if clf_probs is not None:
+                    assert(h.info['proba'][model] == 0)
+                    h.info['proba'][model] = clf_probs[i]
+                # asserts that the hfo is being selected correctly for result i
+                assert (test_labels[i] == h.info['soz'])
+                i += 1
+
+
+def average_folds(model_name, hfo_type_name, model_patients):
+    labels = []
+    preds = []
+    probs = []
+    for p in model_patients:
+        for e in p.electrodes:
+            for h in e.hfos[hfo_type_name]:
+                labels.append(h.info['soz'])
+                # Checked that classes are [False, True] order
+                preds.append(h.info['prediction'][model_name])
+                probs.append(h.info['proba'][model_name])
+
+    return labels, preds, probs
+
+
+# ROCs
+
+def axes_by_model(plt):
+    axes = {
+        # 'SVM': plt.subplot(131),
+        'Balanced RF': plt.subplot(121),
+        'XGBoost': plt.subplot(122),
+        # 'SGD': plt.subplot(133),
+    }
+    return axes
+
+
+def plot_roc_fold(fpr, tpr, model_name, plot_axe, mean_fpr, tprs, aucs, fold):
+    tprs[model_name].append(interp(mean_fpr, fpr, tpr))
+    tprs[model_name][-1][0] = 0.0
+    roc_auc = auc(fpr, tpr)
+    aucs[model_name].append(roc_auc)
+    plot_axe[model_name].plot(fpr, tpr, lw=1, alpha=0.3, label='ROC fold %d (AUC = %0.2f)' % (fold, roc_auc))
+    return tprs
+
+
+def average_ROCs(model_name, plot_axe, mean_fpr, tprs, aucs):
+    plot_axe[model_name].plot([0, 1], [0, 1], linestyle='--', lw=2, color='r', label='Chance', alpha=.8)
+
+    mean_tpr = np.mean(tprs[model_name], axis=0)
+    mean_tpr[-1] = 1.0
+    mean_auc = auc(mean_fpr, mean_tpr)
+    std_auc = np.std(aucs[model_name])
+    plot_axe[model_name].plot(mean_fpr, mean_tpr, color='b',
+                              label=r'Mean ROC (AUC = %0.2f $\pm$ %0.2f)' % (mean_auc, std_auc),
+                              lw=2, alpha=.8)
+
+    std_tpr = np.std(tprs[model_name], axis=0)
+    tprs_lower = np.maximum(mean_tpr - std_tpr, 0)
+    tprs_upper = np.minimum(mean_tpr + std_tpr, 1)
+    plot_axe[model_name].fill_between(mean_fpr, tprs_lower, tprs_upper, color='grey', alpha=.2,
+                                      label=r'$\pm$ 1 std. dev.')
+
+    plot_axe[model_name].set_xlim([-0.05, 1.05])
+    plot_axe[model_name].set_ylim([-0.05, 1.05])
+    plot_axe[model_name].set_xlabel('False Positive Rate')
+    plot_axe[model_name].set_ylabel('True Positive Rate')
+    plot_axe[model_name].set_title('{0} model'.format(model_name))
+    plot_axe[model_name].legend(loc="lower right")
+
+
+def compare_phfo_models(hfo_type_name, loc_name, patients_dic):
+    print('Comparing phfo framework for hfo type: {0} in {1}... '.format(hfo_type_name, loc_name))
+    patients_dic, _ = patients_with_hfos(patients_dic, hfo_type_name)
+    add_phfo_rate_prop(patients_dic, hfo_type_name)
+
+    add_hfo_rate_prop(patients_dic, hfo_type_name)
+    model_patients, validation_patients = pull_apart_validation_set(patients_dic, hfo_type_name)
+    #model_patients = [p for p in patients_dic.values()]
+    model_patient_names = [p.id for p in model_patients]  # Obs mantiene el orden de model_patients
+
+    K = 3
+    test_partition = get_balanced_partition(model_patients, hfo_type_name, K=K, method='deterministic')
+    field_names = ml_field_names(hfo_type_name)
+    fold = 0
+
+    fig = plt.figure(figsize=(10, 5))
+    fig.suptitle('Phfo model comparison for {0} in the {1}'.format(hfo_type_name, loc_name), fontsize=16)
+    mean_fpr = np.linspace(0, 1, 100)
+    tprs = {m: [] for m in models_to_run}
+    fold_thresholds = {m: [] for m in models_to_run}
+    aucs = {m: [] for m in models_to_run}
+    plot_axe = axes_by_model(plt)
+    for p_names in test_partition:  # [[p.id for p in validation_patients]]
+        fold += 1
+        print('Running fold {f}...'.format(f=fold))
+        train_patients = [p for p_name, p in patients_dic.items() if p_name not in p_names]
+        test_patients = [patients_dic[name] for name in p_names]
+        test_pat_idx = [model_patient_names.index(name) for name in p_names]
+        train_features, train_labels = get_features_and_labels(train_patients, hfo_type_name, field_names)
+        test_features, test_labels = get_features_and_labels(test_patients, hfo_type_name, field_names)
+
+        train_features_pd = pd.DataFrame(train_features)
+        test_features_pd = pd.DataFrame(test_features)
+        # train_features_pd, test_features_pd = encode_locations(train_features_pd, test_features_pd,
+        #                                                       loc_names=['loc5'])
+        feature_names = test_features_pd.columns
+        train_features, test_features = train_features_pd.values, test_features_pd.values
+
+        # train_features, train_labels = balance_samples(train_features, train_labels)
+        # scaler = StandardScaler()
+        scaler = RobustScaler()  # Scale features using statistics that are robust to outliers.
+        train_features = scaler.fit_transform(train_features)
+        test_features = scaler.transform(test_features)
+
+        for model_name, model_func in zip(models_to_run, models_to_run_obj):
+            clf_preds, clf_probs = model_func(train_features, train_labels, test_features,
+                                              feature_list=feature_names, hfo_type_name=hfo_type_name)
+            save_prediction(clf_preds, clf_probs, model_patients, test_pat_idx, test_labels,
+                            hfo_type_name, model=model_name)
+
+            fpr, tpr, thresholds = roc_curve(test_labels, clf_probs)
+            fold_thresholds[model_name].append(interp(mean_fpr, fpr, thresholds))
+            tprs = plot_roc_fold(fpr, tpr, model_name, plot_axe, mean_fpr, tprs, aucs, fold)
+
+    # This should agree with mean auc of the rocs
+    mean_thresholds = {m: [] for m in models_to_run}
+    for model_name in models_to_run:
+        labels, preds, probs = average_folds(model_name, hfo_type_name, model_patients)
+        print_metrics(model_name, hfo_type_name, labels, preds, probs)
+        average_ROCs(model_name, plot_axe, mean_fpr, tprs, aucs)
+        print('Thresholds')
+        print(fold_thresholds['XGBoost'])
+        print('Mean thresh')
+        mean_thresholds[model_name] = np.mean(fold_thresholds[model_name], axis=0)
+        print(mean_thresholds['XGBoost'])
+
+    plt.savefig('/home/{user}/{type}_phfo_model_comparison_{loc}.png'.format(user=getpass.getuser(), type=hfo_type_name,
+                                                                             loc=loc_name), format='png')
+    #plt.show()
+
+    return mean_fpr, mean_thresholds
+
+
+def phfo_filter(hfo_type_name, model_name, soz_confidence_thresh, all_patients_dic, new_target=None):  # modifica e.soz,
+
+    model_patients_dic, without_hfo_patients = patients_with_hfos(all_patients_dic, hfo_type_name)
+    add_hfo_rate_prop(model_patients_dic, hfo_type_name)
+    add_phfo_rate_prop(model_patients_dic, hfo_type_name)
+
+    if new_target is not None:
+        pass
+        # TODO implement
+        # filtered_pat_dic = phfo_filter_model(hfo_type_name, target_patients=new_target, training_patients=model_patients_dic)
+    else:
+        only_validation_patients = False
+        field_names = ml_field_names(hfo_type_name)
+
+        if only_validation_patients:
+            # Returns only a filter for validation patients
+            _, target_patients = pull_apart_validation_set(model_patients_dic, hfo_type_name)
+            K = 1
+            test_partition = [[p.id for p in target_patients]]
+            filtered_pat_dic = phfo_ml_filter(hfo_type_name, model_name, field_names, soz_confidence_thresh,
+                                              model_patients_dic, target_patients, test_partition, K)
+        else:
+            # Returns a filter for all using cross validation
+            target_patients = [p for p in model_patients_dic.values()]
+            K = 3
+            test_partition = get_balanced_partition(target_patients, hfo_type_name, K=K, method='deterministic')
+            filtered_pat_dic = phfo_ml_filter(hfo_type_name, model_name, field_names, soz_confidence_thresh,
+                                              model_patients_dic, target_patients, test_partition, K)
+
+    for p_name, p in without_hfo_patients.items():
+        filtered_pat_dic[p_name] = p
+
+    return filtered_pat_dic
+
+
+def phfo_ml_filter(hfo_type_name, model_name, field_names, soz_confidence_thresh,
+                   all_patients_dic, target_patients, test_partition, K):
+    target_patient_names = [p.id for p in target_patients]  # Obs mantiene el orden de target_patients
+    fold = 0
+    for p_names in test_partition:  # [[p.id for p in validation_patients]]
+        fold += 1
+        print('Running fold {f}...'.format(f=fold))
+        train_patients = [p for p_name, p in all_patients_dic.items() if p_name not in p_names]
+        test_patients = [all_patients_dic[name] for name in p_names]
+        test_pat_idx = [target_patient_names.index(name) for name in p_names]
+        train_features, train_labels = get_features_and_labels(train_patients, hfo_type_name, field_names)
+        test_features, test_labels = get_features_and_labels(test_patients, hfo_type_name, field_names)
+
+        train_features_pd = pd.DataFrame(train_features)
+        test_features_pd = pd.DataFrame(test_features)
+        # train_features_pd, test_features_pd = encode_locations(train_features_pd, test_features_pd,
+        #                                                       loc_names=['loc5'])
+        feature_names = test_features_pd.columns
+        train_features, test_features = train_features_pd.values, test_features_pd.values
+
+        # train_features, train_labels = balance_samples(train_features, train_labels)
+        # scaler = StandardScaler()
+        scaler = RobustScaler()  # Scale features using statistics that are robust to outliers.
+        train_features = scaler.fit_transform(train_features)
+        test_features = scaler.transform(test_features)
+        clf_preds, clf_probs = xgboost(train_features, train_labels, test_features,
+                                       feature_list=feature_names, hfo_type_name=hfo_type_name)
+        save_prediction(clf_preds, clf_probs, target_patients, test_pat_idx, test_labels,
+                        hfo_type_name, model=model_name)
+
+    labels, preds, probs = average_folds(model_name, hfo_type_name, target_patients)
+
+    i = 0
+    filtered_pat_dic = dict()
+    for p in target_patients:
+        p_copy = copy.deepcopy(p)
+        for e_copy, e in zip(p_copy.electrodes, p.electrodes):
+            e_copy.hfos[hfo_type_name] = []
+            for h in e.hfos[hfo_type_name]:
+                if probs[i] >= soz_confidence_thresh:
+                    e_copy.add(hfo=copy.deepcopy(h))
+                i += 1
+        filtered_pat_dic[p.id] = p_copy
+
+    return filtered_pat_dic

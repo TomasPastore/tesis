@@ -4,25 +4,57 @@ import numpy as np
 import sklearn.metrics as metrics
 from matplotlib import pyplot as plt
 
-from config import HFO_TYPES
+from config import EVENT_TYPES
 from utils import angle_clusters
 
+
 def encode_type_name(name):
-    return str(HFO_TYPES.index(name) + 1)
+    return str(EVENT_TYPES.index(name) + 1)
 
 
-#Graphics for analysis
+# Graphics for analysis
+def parse_elec_name(doc):
+    if isinstance(doc['electrode'], list):
+        e_name = doc['electrode'][0] if len(doc['electrode']) > 0 else None
+    elif isinstance(doc['electrode'], str):
+        e_name = doc['electrode'] if len(doc['electrode']) > 0 else None
+    else:
+        raise RuntimeError('Unknown type for electrode name')
+    return e_name
 
+
+# Esta funcion es la que generó los gráficos del primer paper de phase coupling
 def compare_hfo_angle_distribution(collection, hfo_type_name, angle_type, fig_title='', angle_step=(np.pi / 9)):
     fig = plt.figure()
     fig.suptitle(fig_title)
+
+    my_dic = {}
+    all = collection.find(
+        filter={'type': encode_type_name(hfo_type_name), angle_type: 1, 'intraop': '0', 'loc5': 'Hippocampus'},
+        projection=['patient_id', 'electrode'])
+    for a in all:
+        if a['patient_id'] not in my_dic.keys():
+            my_dic[a['patient_id']] = set()
+
+        my_dic[a['patient_id']].add(parse_elec_name(a))
+    elec_count = sum([len(elec_set) for elec_set in my_dic.values()])
+    print('group by manual: {0} '.format(elec_count))
+
     for soz_str in ['0', '1']:
-        hfo_filter = { 'type': encode_type_name(hfo_type_name), angle_type: 1, 'intraop': '0', 'soz':soz_str}
-        count_by_group, mean_angle, pvalue, hfo_count = angle_clusters(collection=collection,
-                                                                       hfo_filter= hfo_filter,
-                                                                       angle_field_name=angle_type+'_angle',
-                                                                       amp_step=angle_step,
-                                                                       )
+
+        hfo_filter = {'type': encode_type_name(hfo_type_name),
+                      angle_type: 1,
+                      'intraop': '0',
+                      'soz': soz_str,
+                      'loc5': 'Hippocampus'}
+
+        count_by_group, mean_angle, pvalue, hfo_count, elec_count = angle_clusters(collection=collection,
+                                                                                   hfo_filter=hfo_filter,
+                                                                                   angle_field_name=angle_type + '_angle',
+                                                                                   amp_step=angle_step,
+                                                                                   )
+        z_value = -np.log(pvalue)  # vale porque angles.size >= 50, ver el codigo fuente de rayleightest
+
         angles = []
         values = []
         for k, v in count_by_group.items():
@@ -31,17 +63,17 @@ def compare_hfo_angle_distribution(collection, hfo_type_name, angle_type, fig_ti
 
         axe = plt.subplot(int('12' + str(int(soz_str) + 1)), polar=True)
         title = 'SOZ' if soz_str == '1' else 'NSOZ'
+        # elec_count = 77 if soz_str == '1' else 80
+
         axe.set_title(title, fontdict={'fontsize': 16}, pad=10)
-        polar_bar_plot(fig, axe, angles, values, mean_angle=mean_angle, pvalue=pvalue, hfo_count=hfo_count)
+        polar_bar_plot(fig, axe, angles, values, mean_angle=mean_angle, pvalue=pvalue, hfo_count=hfo_count,
+                       z_value=z_value, elec_count=elec_count)
 
     plt.show()
 
 
-def polar_bar_plot(fig, ax1, angles, values, mean_angle, pvalue, hfo_count):
-    # Data
-    theta = angles
+def polar_bar_plot(fig, ax1, angles, values, mean_angle, pvalue, hfo_count, z_value=0, elec_count=0):
     heights = values
-
     bars = ax1.bar(angles,
                    heights,
                    align='center',
@@ -52,38 +84,25 @@ def polar_bar_plot(fig, ax1, angles, values, mean_angle, pvalue, hfo_count):
                    edgecolor='k',
                    alpha=0.5,
                    label='HFO count (%)')
-
     annot = ax1.annotate("", xy=(0, 0), xytext=(-20, 20), textcoords="offset points",
                          bbox=dict(boxstyle="round", fc="black", ec="b", lw=2),
                          arrowprops=dict(arrowstyle="->"))
-
     annot.set_visible(False)
-
-    ## Main tweaks
     # max_count = max(values)
     max_value = max(values)
     radius_limit = max_value + (10 - max_value % 10)  # finds next 10 multiple
-
-    # Angle ticks
     ax1.set_xticks(np.linspace(0, 2 * np.pi, 18, endpoint=False))
-    # Radius limits
     ax1.set_ylim(0, max_value)
-    # Radius ticks
     ax1.set_yticks(np.linspace(0, radius_limit, 5))
-
-    # Radius tick position in degrees
-    # ax1.set_rlabel_position(135)
-
-    # Additional Tweaks
     ax1.grid(True)
     ax1.legend(loc='upper right', fancybox=True, bbox_to_anchor=(1.05, 1.05))
-
-    info_txt = 'Total HFO count: {count}'.format(count=hfo_count)
+    info_txt = 'Electrode count: {count}'.format(count=elec_count)
     ax1.text(-0.15, .95, info_txt, bbox=dict(facecolor='grey', alpha=0.5), transform=ax1.transAxes)
-
     raleigh_txt = ('Rayleigh Test \n \n'
+                   'Z-value: {zvalue} \n'
                    'P-value: {pvalue} \n'
-                   'Mean: {mean}° \n').format(pvalue="{:.2E}".format(Decimal(pvalue)), mean=round(mean_angle))
+                   'Mean: {mean}° \n').format(zvalue="{:.2E}".format(Decimal(z_value)),
+                                              pvalue="{:.2E}".format(Decimal(pvalue)), mean=round(mean_angle))
     ax1.text(-0.15, 0, raleigh_txt, bbox=dict(facecolor='grey', alpha=0.5), transform=ax1.transAxes)
 
     def update_annot(bar):
@@ -113,10 +132,10 @@ def polar_bar_plot(fig, ax1, angles, values, mean_angle, pvalue, hfo_count):
 
 # Graphics for results
 
-def hfo_rate_by_loc(hfo_type_data_by_loc, zoomed_type=None):
-    fig = plt.figure()
+def event_rate_by_loc(hfo_type_data_by_loc, zoomed_type=None):
+    fig = plt.figure(107)
 
-    #Subplots frames
+    # Subplots frames
     subplot_count = len(hfo_type_data_by_loc.keys())
     if subplot_count == 1:
         rows = 1
@@ -135,9 +154,9 @@ def hfo_rate_by_loc(hfo_type_data_by_loc, zoomed_type=None):
 
     subplot_index = 1
     if zoomed_type is None:
-        fig.suptitle('HFO types rate by location (events per minute)')
+        fig.suptitle('Event types\' rate (events per minute)')
     else:
-        fig.suptitle('{0} subtypes rate by location (events per minute)'.format(zoomed_type))
+        fig.suptitle('{0} subtypes\' rate (events per minute)'.format(zoomed_type))
 
     for loc, rate_data_by_type in hfo_type_data_by_loc.items():
         axe = plt.subplot('{r}{c}{i}'.format(r=rows, c=cols, i=subplot_index))
@@ -146,8 +165,13 @@ def hfo_rate_by_loc(hfo_type_data_by_loc, zoomed_type=None):
         legends = []
         for type, rate_data in rate_data_by_type.items():
             oracles.append(rate_data['soz_labels'])
-            preds.append(rate_data['hfo_rates'])
-            legends.append('{t}. PEWH {pewh}%. HC {hc}'.format(t=type, pewh=rate_data['p_elec_with_hfo'], hc=rate_data['hfo_count']))
+            preds.append(rate_data['evt_rates'])
+            legends.append('{t}. PEWP {pewp}%. HC {hc}. PET {p_phfo_abs}%. PPHFO {phfo_p}%'.format(
+                t=type,
+                pewp=rate_data['p_elec_with_pevts'],
+                hc=rate_data['evt_count'],
+                p_phfo_abs=rate_data['p_pevents_abs'],
+                phfo_p=rate_data['p_pevents']))
             subplot_title = '{l}'.format(l=loc)
 
         superimposed_rocs(oracles, preds, legends, subplot_title, axe, rate_data['elec_count'])
@@ -156,21 +180,6 @@ def hfo_rate_by_loc(hfo_type_data_by_loc, zoomed_type=None):
     plt.subplots_adjust(wspace=0.4, hspace=0.4)
     plt.show()
 
-def roc(labels, preds, legend, title='R0C curve'):
-    plt.title(title)
-    plt.plot([0, 1], [0, 1], 'r--')
-    plt.xlim([0, 1])
-    plt.ylim([0, 1])
-    plt.ylabel('True Positive Rate')
-    plt.xlabel('False Positive Rate')
-
-    fpr, tpr, threshold = metrics.roc_curve(labels, preds)
-    roc_auc = metrics.auc(fpr, tpr)
-    plt.plot(fpr, tpr, 'b', label=legend + ' AUC = %0.2f' % roc_auc)
-    plt.legend(loc='lower right')
-    plt.show()
-
-
 def superimposed_rocs(oracles, preds, legends, title, axe, elec_count):
     axe.set_title(title, fontdict={'fontsize': 10}, loc='left')
     axe.plot([0, 1], [0, 1], 'r--')
@@ -178,7 +187,7 @@ def superimposed_rocs(oracles, preds, legends, title, axe, elec_count):
     axe.set_ylim([0, 1])
     axe.set_ylabel('True Positive Rate')
     axe.set_xlabel('False Positive Rate')
-    colors = ['b', 'g', 'c', 'm', 'y', 'k']
+    colors = ['b', 'g', 'c', 'm', 'y', 'k', 'lightcoral', 'mediumslateblue']
 
     # calculate the fpr and tpr for all thresholds of the classification
     for i in range(len(oracles)):
@@ -195,18 +204,18 @@ def superimposed_rocs(oracles, preds, legends, title, axe, elec_count):
     # ggplot(df, aes(x = 'fpr', y = 'tpr')) + geom_line() + geom_abline(linetype = 'dashed')
 
 
-def feature_importances(feature_list, importances, hfo_type_name):
-    fig = plt.figure()
+def feature_importances(feature_list, importances, hfo_type_name, fig_id):
+    fig = plt.figure(fig_id)
     axe = plt.subplot(111)
-    #plt.style.use('fivethirtyeight')
+    # plt.style.use('fivethirtyeight')
 
-    #Vertical bars
+    # Vertical bars
     # x_values = list(range(len(importances)))
     # axe.bar(importances, x_values, orientation='horizontal')
     # plt.xticks(x_values, feature_list ) #rotation='vertical'
 
-    #Horizontal bars
-    pos=np.arange(len(feature_list))
+    # Horizontal bars
+    pos = np.arange(len(feature_list))
     rects = axe.barh(pos, importances,
                      align='center',
                      height=0.5,
@@ -214,9 +223,37 @@ def feature_importances(feature_list, importances, hfo_type_name):
     axe.set_title('{0} Variable Importances'.format(hfo_type_name))
     axe.set_ylabel('Importance')
     axe.set_xlabel('Variable')
+    plt.show()
 
 
-def plot_histogram(feature_name, soz_data, n_soz_data):
+def hfo_rate_histogram(data, title):
+    print('{0} Histogram'.format('HFO rate per electrode'))
+    fig = plt.figure(19)
+    weight_for_obs_i = 1. / len(data)
+    weights = [weight_for_obs_i] * len(data)  # Option 1
+
+    datas_not_0 = [x for x in data if x > 0]
+    min_rate = min(datas_not_0)
+    print('Min rate after 0: {0}'.format(min_rate))
+    n, bins, patches = plt.hist(
+        data,
+        bins=[0., 0.015] + list(np.linspace(0.015, 15, 150)),
+        weights=weights,
+        histtype='step',
+        color='r',
+        label='HFO rate'
+        # stacked=True,
+    )
+    plt.legend(loc='upper right')
+    print(n)
+    x_label = 'HFO rate'
+    plt.xlabel(x_label)
+    plt.ylabel('Proportion of electrodes')
+    plt.title(title)
+    plt.show()
+
+
+def physiological_vs_pathological_feature_distributions(feature_name, soz_data, n_soz_data):
     # Usage example 'Power Peak', [soz hfos pw pk] [n_soz hfos pw pk]
     print('{0} Histogram'.format(feature_name))
 
@@ -230,14 +267,14 @@ def plot_histogram(feature_name, soz_data, n_soz_data):
 
     rang = (3, 10) if feature_name == 'Power Peak' else None
 
-    # Uncomment for option 1 --> soz + n_soz  == 1
-    weight_for_obs_i = 1. / (len(data[0]) + len(data[1]))
-    weights = [[weight_for_obs_i] * len(data[0]), [weight_for_obs_i] * len(data[1])]  # Option 1
+    # Uncomment for option 1 --> soz + n_soz  == 1  Para mi la correcta es la 2
+    #weight_for_obs_i = 1. / (len(data[0]) + len(data[1]))
+    #weights = [[weight_for_obs_i] * len(data[0]), [weight_for_obs_i] * len(data[1])]  # Option 1
 
     # Uncomment for option 2 --> soz == 1 n_soz == 1 --> soz + n_soz == 2
-    # weight_for_obs_i_soz = 1./len(data[0])
-    # weight_for_obs_i_nsoz = 1./len(data[1])
-    # weights = [ [weight_for_obs_i_soz]*len(data[0]), [weight_for_obs_i_nsoz]*len(data[1]) ]
+    weight_for_obs_i_soz = 1./len(data[0])
+    weight_for_obs_i_nsoz = 1./len(data[1])
+    weights = [ [weight_for_obs_i_soz]*len(data[0]), [weight_for_obs_i_nsoz]*len(data[1]) ]
 
     n, bins, patches = plt.hist(
         data,
@@ -247,7 +284,7 @@ def plot_histogram(feature_name, soz_data, n_soz_data):
         color=[soz_color, n_soz_color],
         label=['SOZ', 'N_SOZ'],
         # stacked=True,
-    )
+     )
 
     print('Sum of bar heights for Soz: {0}'.format(sum(n[0])))
     print('Sum of bars heights for N_Soz: {0}'.format(sum(n[1])))
@@ -273,3 +310,4 @@ def plot_histogram(feature_name, soz_data, n_soz_data):
     # Tweak spacing to prevent clipping of ylabel
     # plt.subplots_adjust(left=0.15)
     plt.show()
+

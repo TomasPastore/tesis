@@ -6,7 +6,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import classification_report, confusion_matrix, accuracy_score
 from sklearn.metrics import roc_auc_score, roc_curve, auc
 from sklearn.tree import export_graphviz
-
+from sklearn.metrics import average_precision_score
 
 def print_roc_auc(labels, preds):
     fpr, tpr, threshold = roc_curve(labels, preds)
@@ -23,6 +23,8 @@ def print_metrics(model, hfo_type_name, y_test, y_pred, y_probs):
     print('Confusion matrix')
     print(confusion_matrix(y_test, y_pred))
     print(classification_report(y_test, y_pred))
+    average_precision = average_precision_score(y_test, y_probs)
+    print('Average precision-recall score: {0:0.2f}'.format(average_precision))
     print('-------------------------------------------')
     print('')
 

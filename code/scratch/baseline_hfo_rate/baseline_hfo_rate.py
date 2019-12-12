@@ -76,7 +76,7 @@ def get_electrodes_data(electrodes_collection, hfo_collection, hfo_type, target_
         hfo_filter = { 'patient_id':patient_intraop_cond , 'loc5':target_loc , 'type': hfo_type, 'intraop':intraop_str}
     else:
         electrodes_filter = {'patient_id':patient_intraop_cond}
-        hfo_filter = { 'patient_id':patient_intraop_cond, 'type': hfo_type, 'intraop':intraop_str}
+        hfo_filter = { 'patient_id':patient_intraop_cond,  '$or': [{'type':'1'}, {'type':'2'}, {'type':'4'}, {'type':'5'} ], 'intraop':intraop_str}
 
     electrodes =  electrodes_collection.find(filter =electrodes_filter,
                                              projection = ['patient_id', 'electrode', 'file_block', 'soz', 'loc2'])
@@ -90,7 +90,6 @@ def get_electrodes_data(electrodes_collection, hfo_collection, hfo_type, target_
     
     #Calculation of hfo rates and soz arrays accross file_blocks
     #Initialize structures
-    max_block = dict()
     patients = dict()
     for e in electrodes:
         patient_id = e['patient_id']
@@ -98,8 +97,6 @@ def get_electrodes_data(electrodes_collection, hfo_collection, hfo_type, target_
         file_block = int(e['file_block'])
         soz = soz_bool(e['soz'])
 
-        if patient_id not in max_block.keys() or max_block[patient_id] < file_block:
-            max_block[patient_id] = file_block
         
         if patient_id not in patients.keys():
             patients[patient_id] = dict()
@@ -117,9 +114,6 @@ def get_electrodes_data(electrodes_collection, hfo_collection, hfo_type, target_
         file_block = int(h['file_block'])
         block_duration = float(h['r_duration'])
         soz = soz_bool(h['soz'])
-
-        if patient_id not in max_block.keys() or max_block[patient_id] < file_block:
-            max_block[patient_id] = file_block
 
         if patient_id not in patients.keys():
             patients[patient_id] = dict()
@@ -143,19 +137,6 @@ def get_electrodes_data(electrodes_collection, hfo_collection, hfo_type, target_
     
     #add empty blocks
 
-    added_blocks = 0
-    added_pat_blocks = []
-    for patient_id, p_electrodes in patients.items():
-        for elec_name, blocks in p_electrodes.items():
-            for i in range(1, max_block[patient_id]+1):
-                    fb = i
-                    if fb not in blocks.keys():
-                        blocks[fb] = ElectrodeInfo(0, None, False)
-                        block_id = patient_id+'_'+str(fb)
-                        if block_id not in added_pat_blocks:
-                            added_blocks +=1
-                            added_pat_blocks.append(block_id)
-    #print(sorted(added_pat_blocks))
     soz_array_all = []
     hfo_rates_all = []
     electrodes_count = 0 
@@ -194,7 +175,7 @@ def get_electrodes_data(electrodes_collection, hfo_collection, hfo_type, target_
                     hfo_rates_all.append(hfo_rate)
 
     hfo_type_names = ['RonO','RonS', 'Spikes', 'Fast RonO', 'Fast RonS', 'Sharp Spikes']
-    print('Data for {0} HFO type:'.format(hfo_type_names[int(hfo_type)-1]))
+    #print('Data for {0} HFO type:'.format(hfo_type_names[int(hfo_type)-1]))
     print('\tLocation target ---> {0}'.format(target_loc))
     print('\tElectrode count ---> {0}'.format(electrodes_count))
     print('\tElectrodes with at least one hfo ---> {0}'.format(rates_not_0))
@@ -211,8 +192,8 @@ def main():
     electrodes_collection = db.Electrodes
 
 
-    target_loc = 'Hippocampus'
-    #target_loc = 'any location'
+    #target_loc = 'Hippocampus'
+    target_loc = 'any location'
     #rate_condition = 'with at least one HFO'
     rate_condition = ''
     intraop = False 
@@ -220,29 +201,30 @@ def main():
     soz_arrays= []
     hfo_rates = []
     legends = []
-    hfo_type_names = ['RonO','RonS', 'Spikes', 'Fast RonO', 'Fast RonS', 'Sharp Spikes']
+    #hfo_type_names = ['RonO','RonS', 'Spikes', 'Fast RonO', 'Fast RonS', 'Sharp Spikes']
 
-    for i in range(len(hfo_type_names)):
-        soz_array, hfo_rate, elec_total, elec_rate_not_0, hfo_count = get_electrodes_data(electrodes_collection, 
-                                                                                          hfo_collection, 
-                                                                                          hfo_type=str(i+1), #str(i+1)
-                                                                                          target_loc=target_loc,
-                                                                                          rate_condition=rate_condition,
-                                                                                          intraop=intraop)
-        soz_arrays.append(soz_array)
-        hfo_rates.append(hfo_rate)
+    #for i in range(len(hfo_type_names)):
+    i=1
+    soz_array, hfo_rate, elec_total, elec_rate_not_0, hfo_count = get_electrodes_data(electrodes_collection, 
+                                                                                      hfo_collection, 
+                                                                                      hfo_type=str(i+1), #str(i+1)
+                                                                                      target_loc=target_loc,
+                                                                                      rate_condition=rate_condition,
+                                                                                      intraop=intraop)
+    soz_arrays.append(soz_array)
+    hfo_rates.append(hfo_rate)
 
-        p_elec_with_hfo=round(100*(elec_rate_not_0/elec_total), 2)
-        elec_considered_count = elec_total if rate_condition == '' else elec_rate_not_0
-        print_elec_c = '' if rate_condition == '' else ', {0} electrodes'.format(elec_considered_count)
-        percentage_str = '{0}% with HFOs'.format(p_elec_with_hfo) if rate_condition == '' \
-                                                                  else '{0}% of total count'.format(p_elec_with_hfo)
-        legends.append('{hfo_type_name}{print_elec_c}, {percentage_str}. HFO count: {hfo_count}'.format(
-            hfo_type_name=hfo_type_names[i], 
-            print_elec_c=print_elec_c,
-            percentage_str=percentage_str,
-            hfo_count=hfo_count
-        ))
+    p_elec_with_hfo=round(100*(elec_rate_not_0/elec_total), 2)
+    elec_considered_count = elec_total if rate_condition == '' else elec_rate_not_0
+    print_elec_c = '' if rate_condition == '' else ', {0} electrodes'.format(elec_considered_count)
+    percentage_str = '{0}% with HFOs'.format(p_elec_with_hfo) if rate_condition == '' \
+                                                              else '{0}% of total count'.format(p_elec_with_hfo)
+    legends.append('{hfo_type_name}{print_elec_c}, {percentage_str}. HFO count: {hfo_count}'.format(
+        hfo_type_name='All HFO types', 
+        print_elec_c=print_elec_c,
+        percentage_str=percentage_str,
+        hfo_count=hfo_count
+    ))
 
     elec_str = 'All non-intraop electrodes' if not intraop else 'All intraop electrodes'
     title = ('ROC by HFO type based on electrodes HFO rate (events/minutes)\n'

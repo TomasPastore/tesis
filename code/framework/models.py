@@ -6,7 +6,8 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.naive_bayes import GaussianNB
 from sklearn.svm import LinearSVC
 from sklearn.linear_model import  SGDClassifier
-from xgboost import XGBClassifier
+from xgboost.sklearn import XGBClassifier
+
 
 def naive_bayes(train_features, train_labels, test_features, feature_list=None, hfo_type_name=None):
     clf = GaussianNB()
@@ -78,13 +79,30 @@ def balanced_random_forest(train_features, train_labels, test_features, feature_
     #graphics.feature_importances(feature_list, rf.feature_importances_, hfo_type_name)
     return rf_predictions, rf_probs
 
-def xgboost(train_features, train_labels, test_features, feature_list=None, hfo_type_name=None):
-    clf = XGBClassifier(nthread=-1)
+def xgboost(train_features, train_labels, test_features, feature_list=None, hfo_type_name=None, fig_id=1):
+    #clf = XGBClassifier(nthread=-1)
+    #'''
+    clf = XGBClassifier(learning_rate=0.05,
+                        n_estimators=1000, #100
+                        max_depth=6,
+                        min_child_weight=3,
+                        gamma=0.05,
+                        subsample=0.8,
+                        colsample_bytree=0.8,
+                        reg_alpha=0.005,
+                        objective='binary:logistic',
+                        nthread=-1,
+                        scale_pos_weight=1,
+                        seed=10,
+                        eval_metric='aucpr'
+                        )
+    #'''
     clf.fit(train_features, train_labels)
     # Predict over test
     clf_predictions = clf.predict(test_features)
     clf_probs = clf.predict_proba(test_features)[:, 1]
 
+    #graphics.feature_importances(feature_list, clf.feature_importances_, hfo_type_name, fig_id)
     return clf_predictions, clf_probs
 
 def sgd(train_features, train_labels, test_features, feature_list=None, hfo_type_name=None):
