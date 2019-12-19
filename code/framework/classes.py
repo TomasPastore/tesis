@@ -48,42 +48,7 @@ class Patient():
                     negative_class_count +=1
         return negative_class_count, positive_class_count, tot_count
 
-    # Devuelve la proporcion de eventos que captura la seleccion types, subtypes,
-    # sobre el total de hfos de todos los tipos.
-    def pevent_percentage_abs(self, event_types, subtypes, hfo_collection, tot_event_filter):
-        if ['Spikes']== event_types or ['Sharp Spikes'] == event_types:
-            return 100
-        else:
-            assert('Spikes' not in event_types and 'Sharp Spikes' not in event_types)
-            tot_event_filter['type'] = {'$in': [encode_type_name(e) for e in HFO_TYPES]}
-            tot_event_filter['soz'] = '1'
 
-            if '$or' in tot_event_filter.keys():
-                del tot_event_filter['$or']
-            tot = hfo_collection.find(filter=tot_event_filter, projection=hfo_query_fields).count()
-
-            considered_count = 0
-            for e in self.electrodes:
-                for type in event_types:
-                    for h in e.events[type]:
-                        if subtypes is None or any([h.info[s] for s in subtypes]):
-                            if h.info['soz']:
-                                considered_count += 1
-            return round(considered_count/ tot, 2)
-
-    #Devuelve la proporcion de patologicos de la seleccion
-    def pevent_percentage(self, event_types, subtypes=None):
-        tot = 0
-        pevents = 0
-        for e in self.electrodes:
-            for type in event_types:
-                for h in e.events[type]:
-                    if subtypes is None or any([h.info[s] for s in subtypes]):
-                        tot += 1
-                        if h.info['soz']:
-                            pevents += 1
-
-        return round(pevents/tot, 2)
 
 class Electrode():
 
@@ -100,56 +65,73 @@ class Electrode():
         self.loc3 = loc3
         self.loc4 = loc4
         self.loc5 = loc5
+        self.evt_count = {type: {} for type in EVENT_TYPES}
+        self.pevt_count = {type: 0 for type in EVENT_TYPES}
 
     def add(self, event):
         self.events[event.info['type']].append(event)
 
     #TODO agregar a notas de tesis que es importante detallar como calculamos el hfo rate
     # Gives you the event rate per minute considering events iff it is of any type of the ones listed
-    # in event_types and in case of hfo type, it also has to have any subtype of of the ones listed in hfo_subtypes.
-    # It also returns how many events were considered to have an idea of the error of the sample
-    # Default is all even types (RonS, Spikes, RonO, etc) and NO restriction about subtypes
-    def get_events_rate(self, event_types=EVENT_TYPES, hfo_subtypes=None):
-        event_count = 0
+    # in event_types
+    def get_events_rate(self, event_types=EVENT_TYPES):
         block_rates = {block_id:[0, duration] for block_id, duration in self.blocks.items()}
+
         for event_type in event_types:
-            for e in self.events[event_type]:
-                    considered = (event_type in ['Spikes', 'Sharp Spikes']) or hfo_subtypes is None
-                    if hfo_subtypes is not None:
-                        for s in hfo_subtypes:
-                            considered = considered or e.info[s]
-                    if considered:
-                        event_count += 1
-                        block_rates[ e.info['file_block'] ][0] += 1
-            # Note: rate[1] is duration, may be None if no hfo was registered for that block
+            for block, count in self.evt_count[event_type].items():
+                block_rates[block][0] += count
+
+        # Note: rate[1] is duration, may be None if no hfo was registered for that block
         block_rates_arr = [(rate[0]/(rate[1]/60)) if rate[1] is not None else 0.0 for rate in block_rates.values()]
         block_rates_arr.sort() #avoids num errors
-        return sum(block_rates_arr)/len(self.blocks), event_count
+        return sum(block_rates_arr)/len(self.blocks)
+
+    def get_events_count(self, event_types=EVENT_TYPES):
+        result = 0
+        for event_type in event_types:
+            for block, count in self.evt_count[event_type].items():
+                result += count
+        return result
 
     def has_pevent(self, event_types=HFO_TYPES):
         for event_type in event_types:
-            for evt in self.events[event_type]:
-                    if evt.info['soz']:
-                       return True
+            if self.pevt_count[event_type] > 0:
+                return True
         return False
 
-    def get_phfo_rate(self, event_types=HFO_TYPES, hfo_subtypes=None):
-        event_count = 0
-        block_rates = {block_id:[0, duration] for block_id, duration in self.blocks.items()}
-        for event_type in event_types:
-            for e in self.events[event_type]:
-                    considered = (event_type in ['Spikes', 'Sharp Spikes']) or hfo_subtypes is None
-                    if hfo_subtypes is not None:
-                        for s in hfo_subtypes:
-                            considered = considered or e.info[s]
-                    if considered and e.info['soz']:
-                        event_count += 1
-                        block_rates[ e.info['file_block'] ][0] += 1
-            # Note: rate[1] is duration, may be None if no hfo was registered for that block
-        block_rates_arr = [(rate[0]/(rate[1]/60)) if rate[1] is not None else 0.0 for rate in block_rates.values()]
-        block_rates_arr.sort() #avoids num errors
-        return sum(block_rates_arr)/len(self.blocks), event_count
+    # Devuelve la proporcion de eventos patologicos que captura la seleccion de event_types sobre el total de hfos de todos los tipos.
+    # Recall de phfos
+    def phfo_capture_score(self, event_types, hfo_collection, tot_event_filter, pat_id):
+        assert (all([e in HFO_TYPES for e in event_types]))
+        tot_event_filter['patient_id'] = pat_id
+        tot_event_filter['electrode'] = self.name
+        tot_event_filter['soz'] = '1'
+        tot_event_filter['type'] = {'$in': [encode_type_name(e) for e in HFO_TYPES]}
 
+        if '$or' in tot_event_filter.keys():
+            del tot_event_filter['$or']
+
+        tot = hfo_collection.find(filter=tot_event_filter).count()
+        captured_count = sum([self.pevt_count[e_type] for e_type in event_types])
+        assert (tot > 0 or captured_count == 0)
+        score = (captured_count / tot) if tot > 0 else 1
+        print('Electrode {0} capture score --> {1} out of {2} phfos of all HFO categories. Score: {3}'.format(
+            self.name,
+            captured_count,
+            tot,
+            score
+        ))
+        return score
+
+    # Devuelve la proporcion de patologicos capturados en el electrodo
+    # La hipotesis es que entre mayor sea, mejor andara el hfo rate
+    def pevent_proportion_score(self, event_types): #Precision de pevents
+        tot = sum([sum([v for v in self.evt_count[e_type].values()]) for e_type in event_types])
+        pevents = sum([self.pevt_count[e_type] for e_type in event_types])
+        assert (tot > 0 or pevents == 0)
+        prop = (pevents / tot) if tot > 0 else 1
+        print('In electrode {0} {1} out of {2} captured events are pathologic. E-soz: {3} . Score: {4}'.format(self.name, pevents, tot, self.soz, prop))
+        return prop
 
     def print(self):
         print('\t\tPrinting electrode {0}'.format(self.name))

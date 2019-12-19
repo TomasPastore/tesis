@@ -132,7 +132,7 @@ def polar_bar_plot(fig, ax1, angles, values, mean_angle, pvalue, hfo_count, z_va
 
 # Graphics for results
 
-def event_rate_by_loc(hfo_type_data_by_loc, zoomed_type=None):
+def event_rate_by_loc(hfo_type_data_by_loc, zoomed_type=None, legend_metrics=['ec','pewp', 'cs', 'ps']):
     fig = plt.figure(107)
 
     # Subplots frames
@@ -166,12 +166,26 @@ def event_rate_by_loc(hfo_type_data_by_loc, zoomed_type=None):
         for type, rate_data in rate_data_by_type.items():
             oracles.append(rate_data['soz_labels'])
             preds.append(rate_data['evt_rates'])
-            legends.append('{t}. PEWP {pewp}%. HC {hc}. PET {p_phfo_abs}%. PPHFO {phfo_p}%'.format(
-                t=type,
-                pewp=rate_data['p_elec_with_pevts'],
-                hc=rate_data['evt_count'],
-                p_phfo_abs=rate_data['p_pevents_abs'],
-                phfo_p=rate_data['p_pevents']))
+            legend = '{t}.'.format(t=type)
+            if type not in ['Spikes', 'Sharp Spikes']:
+                for m in legend_metrics:
+                    if m == 'ec':
+                        legend = legend + ' EC {ec}'.format(ec=rate_data['evt_count'])
+                    if m == 'pewp':
+                        legend = legend + ' PEWP {pewp}%'.format(pewp=rate_data['p_elec_with_pevts'])
+                    if m == 'cs':
+                        legend = legend + ' CS {cs}%'.format(cs=rate_data['capture_score'])
+                    if m == 'ps':
+                        legend = legend + ' PS {prop_score}%'.format(prop_score=rate_data['proportion_score'])
+            else:
+                for m in legend_metrics:
+                    if m == 'ec':
+                        legend = legend + ' EC {ec}'.format(ec=rate_data['evt_count'])
+                    if m == 'pewp':
+                        legend = legend + ' PEWP {pewp}%'.format(pewp=rate_data['p_elec_with_pevts'])
+                    if m == 'ps':
+                        legend = legend + ' PS {prop_score}%'.format(prop_score=rate_data['proportion_score'])
+            legends.append(legend)
             subplot_title = '{l}'.format(l=loc)
 
         superimposed_rocs(oracles, preds, legends, subplot_title, axe, rate_data['elec_count'])
@@ -196,8 +210,8 @@ def superimposed_rocs(oracles, preds, legends, title, axe, elec_count):
         axe.plot(fpr, tpr, colors[i], label=legends[i] + '. AUC = %0.2f' % roc_auc)
 
     axe.legend(loc='lower right', prop={'size': 8})
-    axe.text(0.03, 0.92, 'EC: {0}'.format(elec_count), bbox=dict(facecolor='grey', alpha=0.5), transform=axe.transAxes,
-             fontsize=8)
+    axe.text(0.03, 0.92, 'Elec Count: {0}'.format(elec_count), bbox=dict(facecolor='grey', alpha=0.5),
+             transform=axe.transAxes, fontsize=8)
 
     # method II: ggplot
     # df = pd.DataFrame(dict(fpr = fpr, tpr = tpr))

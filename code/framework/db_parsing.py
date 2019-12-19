@@ -6,6 +6,7 @@ from utils import log
 import math as mt
 
 def parse_patients(electrodes_cursor, hfo_cursor):
+    print('Building patients dic based on query result...')
     patients_dic = dict()
     parse_electrodes(patients_dic, electrodes_cursor)
     parse_events(patients_dic, hfo_cursor)
@@ -145,6 +146,7 @@ def parse_events(patients, event_collection):
 
         # Electrode level
         e_name = parse_elec_name(evt)
+        soz =parse_soz(evt['soz'])
         loc1 = parse_loc(evt, 1)
         loc2 = parse_loc(evt, 2)
         loc3 = parse_loc(evt, 3)
@@ -152,13 +154,13 @@ def parse_events(patients, event_collection):
         loc5 = parse_loc(evt, 5)
 
         if not e_name in patient.electrode_names():
-            electrode = Electrode(e_name, parse_soz(evt['soz']), {file_block: block_duration}, parse_soz(evt['soz_sc']), loc5=loc5)
+            electrode = Electrode(e_name, soz, {file_block: block_duration}, parse_soz(evt['soz_sc']), loc5=loc5)
             patient.add_electrode(electrode)
         else:
             electrode = next(e for e in patient.electrodes if e.name == e_name)
             # Check consistency
-            if (parse_soz(evt['soz']) != electrode.soz or parse_soz(evt['soz_sc']) != electrode.soz_sc):
-                electrode.soz = electrode.soz or parse_soz(evt['soz'])
+            if (soz != electrode.soz or parse_soz(evt['soz_sc']) != electrode.soz_sc):
+                electrode.soz = electrode.soz or soz
                 electrode.soz_sc = electrode.soz_sc or parse_soz(evt['soz_sc'])
 
             if file_block not in electrode.blocks.keys() or electrode.blocks[file_block] is None:
@@ -185,6 +187,15 @@ def parse_events(patients, event_collection):
                     )
                 if loc5 == 'Hippocampus':
                     electrode.loc5 = loc5
+        #Elec count update
+        evt_type = decode_type_name(evt['type'])
+        if file_block not in electrode.evt_count[evt_type].keys():
+            electrode.evt_count[evt_type][file_block] = 1
+        else:
+            electrode.evt_count[evt_type][file_block] += 1
+
+        if soz:
+            electrode.pevt_count[evt_type] += 1
 
         # HFO_level
         info = dict(
@@ -193,7 +204,7 @@ def parse_events(patients, event_collection):
             z=parse_coord(evt['z']),
             prediction={m: 0 for m in models_to_run},  # for saving results of a model
             proba={m: 0 for m in models_to_run},  # for saving results of a model
-            soz=parse_soz(evt['soz']),
+            soz=soz,
             type=decode_type_name(evt['type']),
             file_block=int(evt['file_block']),
             start_t=float(evt['start_t']),
