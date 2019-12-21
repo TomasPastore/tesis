@@ -17,12 +17,14 @@ connection = db.get_connection()
 db = connection.deckard_new
 
 electrodes_collection = db.Electrodes
-electrodes_collection.create_index([('type', pymongo.ASCENDING)], unique=False)
+electrodes_collection.create_index( [('patient_id', "hashed" )] )
+electrodes_collection.create_index( [('electrode', 1)] )
+electrodes_collection.create_index( [('type', "hashed" )] )
 electrodes_collection.create_index([('loc5', pymongo.TEXT)], default_language='english')
 
 hfo_collection = db.HFOs
-hfo_collection.create_index([('type', pymongo.ASCENDING)], unique=False)
 hfo_collection.create_index([('loc5', pymongo.TEXT)], default_language='english')
+hfo_collection.create_index( [('patient_id', 1), ('electrode', 1), ('intraop',1), ('type', 1)] )
 
 
 # Gathers info about patients rate data.
@@ -64,7 +66,7 @@ def rate_data(patients_dic, event_types=EVENT_TYPES, evt_filter=None):
         'evt_count': event_count,
         'p_elec_with_evts': round(100 * (elec_with_events / elec_count), 2),
         'p_elec_with_pevts': round(100 * (elec_with_pevents / elec_count), 2),
-        'capture_score': round(100 * np.mean(elec_capture_scores), 2), #cuantos phfo caputra en promedio cada electrodo
+        'capture_score': round(100 * np.mean(elec_capture_scores), 2) if len(elec_capture_scores) > 0 else 1, #cuantos phfo caputra en promedio cada electrodo
         'proportion_score': round(100 * np.mean(elec_proportion_scores), 2) #cuantos de los capturados son phfo en promedio entre electrodos
     }
     return rate_info
@@ -199,21 +201,35 @@ def build_rate_table(event_type_names=EVENT_TYPES, loc_granularity=0, locations=
 #EXPERIMENTS
 #1 HFO rate of the 4 HFO types colapsed agains spike rate in all brain
 def All_brain_HFOs_vs_Spikes(intraop=False):
+    import time
+
+    print('Building structures from db...')
+    start_time = time.time()
     loc = None
     loc_name = 'Whole brain electrodes'
-
     event_type_data_by_loc = dict()
     event_type_data_by_loc[loc_name] = dict()
     elec_filter, evt_filter = query_filters(intraop, HFO_TYPES + ['Spikes'], loc, loc_name)
     elec_cursor = electrodes_collection.find(elec_filter, projection=electrodes_query_fields)
     hfo_cursor = hfo_collection.find(evt_filter, projection=hfo_query_fields)
     patients_dic = parse_patients(elec_cursor, hfo_cursor)
-    event_type_data_by_loc[loc_name]['HFOs'] = rate_data(patients_dic, HFO_TYPES,
-                                                         evt_filter=evt_filter)
-    event_type_data_by_loc[loc_name]['Spikes'] = rate_data(patients_dic, ['Spikes'],
-                                                         evt_filter=evt_filter)
+    print('{0} seconds for parsing patients data'.format(time.time() - start_time))
 
+    print('Calculating Spikes rate data')
+    start_time = time.time()
+    event_type_data_by_loc[loc_name]['Spikes'] = rate_data(patients_dic, ['Spikes'], evt_filter=evt_filter)
+    print('{0} seconds for rate hfo data'.format(time.time() - start_time))
+
+    print('Calculating HFOs rate data')
+    start_time = time.time()
+    event_type_data_by_loc[loc_name]['HFOs'] = rate_data(patients_dic, HFO_TYPES, evt_filter=evt_filter)
+    print('{0} seconds for rate hfo data'.format(time.time() - start_time))
+
+    print('Plotting...')
+    start_time = time.time()
     graphics.event_rate_by_loc(event_type_data_by_loc, legend_metrics=['ec', 'pewp', 'ps'])
+    print('{0} seconds for the graphic'.format(time.time() - start_time))
+
     plt.show()
 
 #2) Separating types beats spikes and RonS is best

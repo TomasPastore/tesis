@@ -6,7 +6,6 @@ from utils import log
 import math as mt
 
 def parse_patients(electrodes_cursor, hfo_cursor):
-    print('Building patients dic based on query result...')
     patients_dic = dict()
     parse_electrodes(patients_dic, electrodes_cursor)
     parse_events(patients_dic, hfo_cursor)

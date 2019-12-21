@@ -111,16 +111,16 @@ class Electrode():
         if '$or' in tot_event_filter.keys():
             del tot_event_filter['$or']
 
-        tot = hfo_collection.find(filter=tot_event_filter).count()
+        tot = hfo_collection.find(filter=tot_event_filter, projection=[]).count()
         captured_count = sum([self.pevt_count[e_type] for e_type in event_types])
         assert (tot > 0 or captured_count == 0)
         score = (captured_count / tot) if tot > 0 else 1
-        print('Electrode {0} capture score --> {1} out of {2} phfos of all HFO categories. Score: {3}'.format(
+        '''print('Electrode {0} capture score --> {1} out of {2} phfos of all HFO categories. Score: {3}'.format(
             self.name,
             captured_count,
             tot,
             score
-        ))
+        ))'''
         return score
 
     # Devuelve la proporcion de patologicos capturados en el electrodo
@@ -130,7 +130,7 @@ class Electrode():
         pevents = sum([self.pevt_count[e_type] for e_type in event_types])
         assert (tot > 0 or pevents == 0)
         prop = (pevents / tot) if tot > 0 else 1
-        print('In electrode {0} {1} out of {2} captured events are pathologic. E-soz: {3} . Score: {4}'.format(self.name, pevents, tot, self.soz, prop))
+        #print('In electrode {0} {1} out of {2} captured events are pathologic. E-soz: {3} . Score: {4}'.format(self.name, pevents, tot, self.soz, prop))
         return prop
 
     def print(self):
