@@ -1,9 +1,4 @@
-import copy
 
-from classes import Patient, Electrode, Event
-from config import EVENT_TYPES, models_to_run
-from utils import log
-import math as mt
 
 def parse_patients(electrodes_cursor, hfo_cursor):
     patients_dic = dict()
@@ -15,10 +10,11 @@ def parse_patients(electrodes_cursor, hfo_cursor):
 def parse_age(doc):
     return 0.0 if doc['age'] == "empty" else float(doc['age'])
 
-
 def parse_soz(db_representation_str):
     return (True if db_representation_str == "1" else False)
 
+def encode_type_name(name):
+    return str(EVENT_TYPES.index(name) + 1)
 
 def decode_type_name(type_id):
     return EVENT_TYPES[int(type_id) - 1]
@@ -34,6 +30,20 @@ def parse_elec_name(doc):
     else:
         raise RuntimeError('Unknown type for electrode name')
     return e_name
+
+from utils import log, all_loc_names
+from classes import Patient, Electrode, Event
+from config import EVENT_TYPES, models_to_run
+import math as mt
+
+def parse_locations(loc_granularity, locations):
+    if loc_granularity == 0:
+        loc = None
+        locations = ['Whole brain']
+    else:
+        loc = 'loc{i}'.format(i=loc_granularity)
+        locations = all_loc_names(granularity=loc_granularity) if locations == 'all' else locations
+    return loc, locations
 
 
 def parse_loc(doc, i):

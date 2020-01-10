@@ -50,3 +50,5 @@ non_intraop_patients = ['2061', '3162', '3444', '3452', '3656', '3748', '3759', 
                         'IO005', 'IO006', 'IO008', 'IO009', 'IO010', 'IO012', 'IO013', 'IO014', 'IO015', 'IO017',
                         'IO018', 'IO019', 'IO021', 'IO022', 'IO023', 'IO024', 'IO025', 'IO027']
 
+# 25% of hippocampus query created with get_balanced_partition method='deterministic'
+validation_pat_names = ['4122', 'IO014', '3759', '478', 'IO013', '4050', '467', 'IO005', 'IO004', '451', '456']

@@ -40,7 +40,7 @@ class Patient():
         positive_class_count = 0
         tot_count=0
         for e in self.electrodes:
-            for h in e.hfos[hfo_type_name]:
+            for h in e.events[hfo_type_name]:
                 tot_count +=1
                 if h.info['soz']:
                     positive_class_count +=1
@@ -71,12 +71,22 @@ class Electrode():
     def add(self, event):
         self.events[event.info['type']].append(event)
 
+    def flush_cache(self, event_types):
+        for event_type in event_types:
+            for block in self.evt_count[event_type].keys():
+                self.evt_count[event_type][block] = 0
+            self.pevt_count[event_type] = 0
+
+            for evt in self.events[event_type]:
+                self.evt_count[event_type][evt.info['file_block']] +=1
+                if evt.info['soz']:
+                    self.pevt_count[event_type] += 1
+
     #TODO agregar a notas de tesis que es importante detallar como calculamos el hfo rate
     # Gives you the event rate per minute considering events iff it is of any type of the ones listed
     # in event_types
     def get_events_rate(self, event_types=EVENT_TYPES):
         block_rates = {block_id:[0, duration] for block_id, duration in self.blocks.items()}
-
         for event_type in event_types:
             for block, count in self.evt_count[event_type].items():
                 block_rates[block][0] += count
@@ -99,7 +109,8 @@ class Electrode():
                 return True
         return False
 
-    # Devuelve la proporcion de eventos patologicos que captura la seleccion de event_types sobre el total de hfos de todos los tipos.
+    # Devuelve la proporcion de eventos patologicos que captura la seleccion de event_types sobre el total de phfos de todos los tipos.
+    # Si no hay ningun phfo levanta una excepcion para no considerar al electrodo ya que no habia nada que capturar
     # Recall de phfos
     def phfo_capture_score(self, event_types, hfo_collection, tot_event_filter, pat_id):
         assert (all([e in HFO_TYPES for e in event_types]))
@@ -113,25 +124,37 @@ class Electrode():
 
         tot = hfo_collection.find(filter=tot_event_filter, projection=[]).count()
         captured_count = sum([self.pevt_count[e_type] for e_type in event_types])
-        assert (tot > 0 or captured_count == 0)
-        score = (captured_count / tot) if tot > 0 else 1
-        '''print('Electrode {0} capture score --> {1} out of {2} phfos of all HFO categories. Score: {3}'.format(
-            self.name,
-            captured_count,
-            tot,
-            score
-        ))'''
-        return score
+        #captured_scores_arr = [self.pevt_count[e_type]/tot if tot > 0 else 1 for e_type in HFO_TYPES]
+        #print('Capture score debug')
+        #print(captured_scores_arr)
+        #s = sum(captured_scores_arr)
+        #print(s)
+        if tot > 0:
+            score = captured_count / tot
+            print(
+                'Patient {0} Electrode {1} capture score --> {2} out of {3} phfos of all HFO categories. Score: {4}'.format(
+                    pat_id,
+                    self.name,
+                    captured_count,
+                    tot,
+                    score,
+            ))
+            return score
+        else:
+            raise RuntimeWarning('There are no phfos in this channel. Do not consider capture score.')
 
     # Devuelve la proporcion de patologicos capturados en el electrodo
-    # La hipotesis es que entre mayor sea, mejor andara el hfo rate
+    # La hipotesis es que entre mayor sea para los que tienen algun phfo, mejor andara el hfo rate
+    # Los que no tienen ningun phfo no son considerados porque tendrian hfo rate 0 con filtro perfecto y eso clasificaria bien igual
     def pevent_proportion_score(self, event_types): #Precision de pevents
         tot = sum([sum([v for v in self.evt_count[e_type].values()]) for e_type in event_types])
         pevents = sum([self.pevt_count[e_type] for e_type in event_types])
-        assert (tot > 0 or pevents == 0)
-        prop = (pevents / tot) if tot > 0 else 1
-        #print('In electrode {0} {1} out of {2} captured events are pathologic. E-soz: {3} . Score: {4}'.format(self.name, pevents, tot, self.soz, prop))
-        return prop
+        if tot>0 :
+            prop = pevents / tot
+            # print('In electrode {0} {1} out of {2} captured events are pathologic. E-soz: {3} . Score: {4}'.format(self.name, pevents, tot, self.soz, prop))
+            return prop
+        else:
+            raise RuntimeWarning('There are no phfos in this channel. Do not consider proportion score.')
 
     def print(self):
         print('\t\tPrinting electrode {0}'.format(self.name))
