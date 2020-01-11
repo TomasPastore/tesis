@@ -10,6 +10,7 @@ from models import naive_bayes, random_forest, svm_m, balanced_random_forest, xg
 
 models_to_run = ['XGBoost'] #'xgboost'
 models_to_run_obj = [xgboost]
+models_dic = {'XGBoost': xgboost}
 
 electrodes_query_fields = ['patient_id', 'age', 'file_block', 'electrode',
                            'loc1', 'loc2', 'loc3', 'loc4', 'loc5',

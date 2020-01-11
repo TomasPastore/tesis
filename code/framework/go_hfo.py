@@ -10,7 +10,7 @@ from classes import Database
 from config import (EVENT_TYPES, HFO_TYPES,
                     intraop_patients, non_intraop_patients, electrodes_query_fields, hfo_query_fields)
 from db_parsing import parse_patients, parse_locations, encode_type_name
-from phfos import compare_phfo_models, phfo_filter
+from phfos import phfo_filter
 from utils import histograms, phase_coupling_paper_polar, all_subtype_names, all_loc_names
 
 db = Database()
@@ -74,11 +74,8 @@ def rate_data(patients_dic, event_types=EVENT_TYPES, evt_filter=None, flush=Fals
                 elec_with_events += 1
             if e.has_pevent(event_types):
                 elec_with_pevents += 1
-            try:
-                prop_score = e.pevent_proportion_score(event_types)
-                elec_proportion_scores.append(prop_score)
-            except RuntimeWarning:
-                print('Skipping useless channel for proportion score')
+            prop_score, empty = e.pevent_proportion_score(event_types)
+            elec_proportion_scores.append(prop_score)
 
     if elec_count == 0:
         print(evt_filter)
@@ -130,7 +127,7 @@ def compare_event_type_rates_by_loc(event_type_names=EVENT_TYPES, loc_granularit
                     'AUC_ROC']
 
             if filter_phfos and evt_type_name != 'Spikes':
-                patients_dic = phfo_filter(evt_type_name, patients_dic, include=['model_pat', 'validation_pat'],
+                patients_dic = phfo_filter(evt_type_name, patients_dic, target=['model_pat', 'validation_pat'],
                                            tolerated_fpr=None, perfect=True)
                 for p in patients_dic.values():
                     for e in p.electrodes:
@@ -278,26 +275,31 @@ def hippocampus_RonS_p_analisis():
     elec_cursor = electrodes_collection.find(elec_filter, projection=electrodes_query_fields)
     hfo_cursor = hfo_collection.find(evt_filter, projection=hfo_query_fields)
     patients_dic = parse_patients(elec_cursor, hfo_cursor)
-
+    sozs = []
     red = []
     green = []
     orange = []
     yellow = []
     p_proportions = []
     pevt_counts = []
+    empties = []
+    all_empties= []
+    with_hfos = []
     for p in patients_dic.values():
         for e in p.electrodes:
             soz = e.soz
+            sozs.append(soz)
             phfo = e.has_pevent(['RonS'])
             if phfo:
                 pevt_counts.append(e.pevt_count['RonS'])
 
-            try:
-                prop_score = e.pevent_proportion_score(['RonS'])
-                p_proportions.append(prop_score)
-            except RuntimeWarning():
-                print('Skipping useless channel for proportion score')
-
+            prop_score, empty = e.pevent_proportion_score(['RonS'])
+            all_empties.append(empty)
+            if empty:
+                empties.append(prop_score)
+            else:
+                with_hfos.append(prop_score)
+            p_proportions.append(prop_score)
             if soz and phfo:
                 red.append(prop_score)
             elif not soz and not phfo:
@@ -307,76 +309,50 @@ def hippocampus_RonS_p_analisis():
             elif not soz and phfo:
                 yellow.append(prop_score)
 
+    # Con lo del assert en parsing db verifica que
+    #TODOS LOS ELECTRODOS QUE TIENEN UN PHFO SON SOZ...  en hippocampo
+    for i in range(len(sozs)):
+        print('SOZ vs props')
+        print('SOZ: {0}'.format(sozs[i]))
+        print('Empty: {0}'.format(all_empties[i]))
+        print('Phfo proportion: {0}'.format(p_proportions[i]))
+
+
+    print('With hfos props')
+    print(with_hfos)
+    print('Empty electrodes props')
+    print(empties)
+    elec_count = len(with_hfos) + len(empties)
+    print('Total elec count {0}'.format(elec_count))
+    print('Empty proportion {0}'.format(len(empties)/elec_count))
+
+    graphics.barchart(len(red), len(green), len(yellow), len(orange))
     #Barras red, green, orange, yellow
     graphics.histogram(p_proportions, title='Hippocampal RonS pathologic proportion per electrode',
                        label='Electrode pathologic proportion', x_label='Pathologic proportion')
 
     graphics.histogram(pevt_counts, title='Hippocampal RonS pathologic event count per electrode',
-                       label='Electrode pathologic count', x_label='Pathologic count')
+                       label='Electrode pathologic count', x_label='Pathologic count', bins=np.arange(0,2800, 50))
 
 
 # 6th
 # ml_training
-# Partition analysis
-# Comparar modelos con y sin SMOTETOMEK
-# Gana xgboost con smotetomek y la particion de balanceo
-# Fine tuning xgboost
+#Compara modelos con y sin balanceo.
+def hippocampal_RonS_model_v0():
+    pass #carga base y llama a predictor v0
+
+#Compara la particion
+def hippocampal_RonS_model_V1():
+    pass
+#Fine tunea
+def hippocampal_RonS_model_V2():
+    pass
 
 # 7th
 # Filtrar y ver si dio mejor
 
 # 8TH
 # Establecer un theshold para mejorarlo
-
-
-def improve_FRonS(loc_granularity=5, locations='all', intraop=False, filter_phfos=False):
-    hfo_type_name = 'RonS'
-    loc, locations = parse_locations(loc_granularity, locations)
-    hfo_type_data_by_loc = dict()
-    for loc_name in locations:
-        hfo_type_data_by_loc[loc_name] = dict()
-        elec_filter, evt_filter = query_filters(intraop, [hfo_type_name], loc, loc_name)
-        elec_cursor = electrodes_collection.find(elec_filter, projection=electrodes_query_fields)
-        hfo_cursor = hfo_collection.find(evt_filter, projection=hfo_query_fields)
-        patients_dic = parse_patients(elec_cursor, hfo_cursor)
-        hfo_type_data_by_loc[loc_name][hfo_type_name + '_baseline'] = rate_data(patients_dic, [hfo_type_name],
-                                                                                evt_filter=evt_filter)
-        compare_phfo_models(hfo_type_name, loc_name, copy.deepcopy(patients_dic))
-        if filter_phfos:
-            patients_dic = phfo_filter(hfo_type_name, loc_name, all_patients_dic=patients_dic)
-            hfo_type_data_by_loc[loc_name]['Filtered_' + hfo_type_name] = rate_data(patients_dic, [hfo_type_name],
-                                                                                    evt_filter=evt_filter)
-    graphics.event_rate_by_loc(hfo_type_data_by_loc)
-    plt.show()
-
-
-# TODO
-def improve_FRonO(loc_granularity=2, locations='all', intraop=False, filter_phfos=False):
-    hfo_type_name = 'Fast RonO'
-    loc, locations = parse_locations(loc_granularity, locations)
-    hfo_type_data_by_loc = dict()
-    for loc_name in locations:
-        hfo_type_data_by_loc[loc_name] = dict()
-
-        elec_filter, evt_filter = query_filters(intraop, [hfo_type_name], loc, loc_name)
-
-        elec_cursor = electrodes_collection.find(elec_filter, projection=electrodes_query_fields)
-        hfo_cursor = hfo_collection.find(evt_filter, projection=hfo_query_fields)
-        patients_dic = parse_patients(elec_cursor, hfo_cursor)
-        hfo_type_data_by_loc[loc_name][hfo_type_name + '_baseline'] = rate_data(patients_dic, [hfo_type_name],
-                                                                                evt_filter=evt_filter)
-
-        if filter_phfos:
-            patients_dic = phfo_filter(hfo_type_name, loc_name, all_patients_dic=patients_dic)
-            hfo_type_data_by_loc[loc_name]['Filtered_' + hfo_type_name] = rate_data(patients_dic, [hfo_type_name],
-                                                                                    evt_filter=evt_filter)
-
-    graphics.event_rate_by_loc(hfo_type_data_by_loc)
-
-    plt.show()
-
-
-
 
 def main():
     # print('HFO types to run: {0}'.format(type_names_to_run))
@@ -395,15 +371,19 @@ def main():
     # 3rd experiment
     # Pscore analizes by location
     # Esta es para ver otra forma que tener mas phfo correlaciona con mejor auc roc si tomamos hfo rate
-    analize_pscores()
+    #analize_pscores()
     #ver los fisiologicos, si son todos soz o todos fisiologicos el filtro no tiene sentido
     # 4th experiment
     # Perfect filter in Hippocampus
-    #hippocampus_perfect_filter() #TODO VER SI DA BIEN SOLO PORQUE UN PHFO IMPLICA SOZ , EN ESE CASO ES MEJOR
-
+    #hippocampus_perfect_filter() #Lo del assert false en db parsing implica que esto sirve porque si tiene un phfo es soz, entonces esto hace que haya una separacion directa. Excepto por los naranjas.
+    #El clasificador tiene que pegarle al menos a un bajito porcentaje de los soz por canal recall 0.5 por canal(permito FN),
+    # pero no tener falsos positivos, es decir que un fisiologico es tomado por patologico. ALTO FN bajo FP
+    # aumentar la pnealizacion del error de tener FP , voy  a dudar de la prediccion que dice que es P, quiero estar seguro.
+    # La prob de para decir P  tiene que ser de las mas altas de la distr que dicen p y le pegan
     # 5th
     #hippocampus_RonS_p_analisis()
     # 6th
+    hippocampal_RonS_model_v0()
     # ml_filter_training
 
     # 7th

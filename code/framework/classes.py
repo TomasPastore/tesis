@@ -149,12 +149,11 @@ class Electrode():
     def pevent_proportion_score(self, event_types): #Precision de pevents
         tot = sum([sum([v for v in self.evt_count[e_type].values()]) for e_type in event_types])
         pevents = sum([self.pevt_count[e_type] for e_type in event_types])
-        if tot>0 :
-            prop = pevents / tot
-            # print('In electrode {0} {1} out of {2} captured events are pathologic. E-soz: {3} . Score: {4}'.format(self.name, pevents, tot, self.soz, prop))
-            return prop
-        else:
-            raise RuntimeWarning('There are no phfos in this channel. Do not consider proportion score.')
+        prop = pevents / tot if tot>0 else 1
+        empty = tot==0
+        print('Canal sin ningun hfo')
+        # print('In electrode {0} {1} out of {2} captured events are pathologic. E-soz: {3} . Score: {4}'.format(self.name, pevents, tot, self.soz, prop))
+        return prop, empty
 
     def print(self):
         print('\t\tPrinting electrode {0}'.format(self.name))

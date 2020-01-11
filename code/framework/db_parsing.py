@@ -168,9 +168,12 @@ def parse_events(patients, event_collection):
         else:
             electrode = next(e for e in patient.electrodes if e.name == e_name)
             # Check consistency
-            if (soz != electrode.soz or parse_soz(evt['soz_sc']) != electrode.soz_sc):
-                electrode.soz = electrode.soz or soz
-                electrode.soz_sc = electrode.soz_sc or parse_soz(evt['soz_sc'])
+            if not electrode.soz and soz:
+                assert(False)
+
+            #if (soz != electrode.soz or parse_soz(evt['soz_sc']) != electrode.soz_sc):
+            #    electrode.soz = electrode.soz or soz
+            #    electrode.soz_sc = electrode.soz_sc or parse_soz(evt['soz_sc'])
 
             if file_block not in electrode.blocks.keys() or electrode.blocks[file_block] is None:
                 electrode.blocks[file_block] = block_duration

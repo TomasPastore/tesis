@@ -318,17 +318,19 @@ def hfo_rate_histogram(data, title):
     plt.title(title)
     plt.show()
 
-def histogram(data, title, label, x_label):
+def histogram(data, title, label, x_label, bins=None):
+    plt.figure()
     weight_for_obs_i = 1. / len(data)
     weights = [weight_for_obs_i] * len(data)
-    print('Values')
+    print('Phfo stats: {0}'.format(title))
     print(sorted(data))
-    print('Mean of {0}: {1}'.format(title, np.mean(data)))
-    print('std of {0}: {1}'.format(title, np.std(data)))
-    print('median of {0}: {1}'.format(title, np.median(data)))
+    print('Mean: {0}'.format(np.mean(data)))
+    print('Std: {0}'.format(np.std(data)))
+    print('Median: {0}'.format(np.median(data)))
 
     n, bins, patches = plt.hist(
         data,
+        bins=bins,
         weights=weights,
         histtype='step',
         color='r',
@@ -340,6 +342,24 @@ def histogram(data, title, label, x_label):
     plt.xlabel(x_label)
     plt.ylabel('Frequency')
     plt.title(title)
+    plt.show()
+
+
+def barchart(red, green, yellow, orange):
+    labels = ['SOZ elec with phfos', 'NSOZ elec without phfos', 'NSOZ elec with phfos', 'SOZ elec without phfos']
+    fig = plt.figure()
+    ax = plt.subplot(111)
+    print('print color counts')
+    print('red {0}, green {1}, yellow {2}, orange {3}'.format(red,green,yellow,orange))
+    x= [1,2,3,4]
+    ax.bar(1, red, color='r') #ok
+    ax.bar(2, green, color='g') #ok
+    ax.bar(3, yellow, color='y') #ok
+    ax.bar(4, orange, color='orange') #ok
+
+    # Add some text for labels, title and custom x-axis tick labels, etc.
+    ax.set_ylabel('Count')
+    ax.set_title('Elec color count')
     plt.show()
 
 
