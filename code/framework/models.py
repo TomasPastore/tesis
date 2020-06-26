@@ -1,3 +1,5 @@
+from random import random, choices
+
 from sklearn.calibration import CalibratedClassifierCV
 from sklearn.ensemble import RandomForestClassifier
 from imblearn.ensemble import BalancedRandomForestClassifier
@@ -8,13 +10,39 @@ from sklearn.svm import LinearSVC
 from sklearn.linear_model import  SGDClassifier
 from xgboost.sklearn import XGBClassifier
 
+estimators = {'XGBoost': XGBClassifier(nthread=-1) }
+#Ver como estimar prob
+def simulator(test_labels, distr, confidence):
+    simulated_preds = []
+    simulated_probs = []
+    for soz_label in test_labels:
+        r = random()
+        if soz_label:
+            if r <= confidence:
+                pred = 1
+                prob = choices(distr['TP'], weights=[1/len(distr['TP'])] * len(distr['TP']))[0]
+            else:
+                pred = 0
+                prob = choices(distr['FN'], weights=[1/len(distr['FN'])] * len(distr['FN']))[0]
+        else:
+            if r <= confidence:
+                pred = 0
+                prob = choices(distr['TN'], weights=[1/len(distr['TN'])] * len(distr['TN']))[0]
+            else:
+                pred = 1
+                prob = choices(distr['FP'], weights=[1/len(distr['FP'])] * len(distr['FP']))[0]
+        assert(not isinstance(prob, list))
+        simulated_preds.append(pred)
+        simulated_probs.append(prob)
+    return simulated_preds, simulated_probs
+
 
 def naive_bayes(train_features, train_labels, test_features, feature_list=None, hfo_type_name=None):
     clf = GaussianNB()
     clf.fit(train_features, train_labels)
     clf_predictions = clf.predict(test_features)
     clf_probs = clf.predict_proba(test_features)[:, 1]
-    return clf_predictions, clf_probs
+    return clf_predictions, clf_probs, clf
 
 def svm_m(train_features, train_labels, test_features, feature_list=None, hfo_type_name=None):
 
@@ -32,9 +60,8 @@ def svm_m(train_features, train_labels, test_features, feature_list=None, hfo_ty
     else:
         clf_probs= None
 
-    return clf_predictions, clf_probs
+    return clf_predictions, clf_probs, clf
 
-printed = dict()
 def random_forest(train_features, train_labels, test_features, feature_list=None, hfo_type_name=None):
 
     rf = RandomForestClassifier(
@@ -60,12 +87,11 @@ def random_forest(train_features, train_labels, test_features, feature_list=None
     #    printed[hfo_type_name] = True
     #    print_feature_importances(rf, feature_list)
     #    graphics.feature_importances(feature_list, rf.feature_importances_, hfo_type_name)
-    return rf_predictions, rf_probs
+    return rf_predictions, rf_probs, rf
 
 
 def balanced_random_forest(train_features, train_labels, test_features, feature_list=None, hfo_type_name=None):
     rf = BalancedRandomForestClassifier(
-        n_estimators=1000,
         random_state=32,
         n_jobs=-1,  # use all available processors
         # class_weight='balanced_subsample'
@@ -77,12 +103,13 @@ def balanced_random_forest(train_features, train_labels, test_features, feature_
 
     #print_feature_importances(rf, feature_list)
     #graphics.feature_importances(feature_list, rf.feature_importances_, hfo_type_name)
-    return rf_predictions, rf_probs
+    return rf_predictions, rf_probs, rf
 
-def xgboost(train_features, train_labels, test_features, feature_list=None, hfo_type_name=None, fig_id=1):
-    #clf = XGBClassifier(nthread=-1)
-    #'''
-    clf = XGBClassifier(learning_rate=0.05,
+def xgboost(train_features, train_labels, test_features, feature_list=None, hfo_type_name=None):
+
+    clf = XGBClassifier(nthread=-1)
+    '''
+    #clf = XGBClassifier(learning_rate=0.05,
                         n_estimators=1000, #100
                         max_depth=6,
                         min_child_weight=3,
@@ -94,16 +121,16 @@ def xgboost(train_features, train_labels, test_features, feature_list=None, hfo_
                         nthread=-1,
                         scale_pos_weight=1,
                         seed=10,
-                        eval_metric='aucpr'
+                        eval_metric='aucpr' #'aucpr'
                         )
-    #'''
+    '''
     clf.fit(train_features, train_labels)
     # Predict over test
     clf_predictions = clf.predict(test_features)
     clf_probs = clf.predict_proba(test_features)[:, 1]
 
     #graphics.feature_importances(feature_list, clf.feature_importances_, hfo_type_name, fig_id)
-    return clf_predictions, clf_probs
+    return clf_predictions, clf_probs, clf
 
 def sgd(train_features, train_labels, test_features, feature_list=None, hfo_type_name=None):
     clf = SGDClassifier(loss='modified_huber', max_iter=1000, n_jobs=-1)
@@ -112,4 +139,4 @@ def sgd(train_features, train_labels, test_features, feature_list=None, hfo_type
     clf_predictions = clf.predict(test_features)
     clf_probs = clf.predict_proba(test_features)[:, 1]
 
-    return clf_predictions, clf_probs
+    return clf_predictions, clf_probs, clf

@@ -1,16 +1,29 @@
+from models import naive_bayes, random_forest, svm_m, balanced_random_forest, xgboost, sgd, simulator
+
 DEBUG = True
-EVENT_TYPES = ['RonO', 'RonS', 'Spikes', 'Fast RonO', 'Fast RonS', 'Sharp Spikes']
-HFO_TYPES = ['RonO', 'RonS', 'Fast RonO', 'Fast RonS']
-HFO_SUBTYPES = ['slow', 'delta', 'theta', 'spindle', 'spike']
+LOG = {}
 
+#PROBAR CON EL FILTRO EN ELECTRODOS DE FILTRAR LOS X Y Z VALIDOS
+
+#Global var for biomarkers to be loaded and analized
+type_names_to_run =  ['RonS'] #default value
 #type_names_to_run =  ['RonO', 'RonS', 'Fast RonO', 'Fast RonS']
-type_names_to_run =  ['RonS']
 
-from models import naive_bayes, random_forest, svm_m, balanced_random_forest, xgboost, sgd
+#Global var of the models of ml to run, XGBoost default
+models_to_run = ['XGBoost'] # 'Balanced random forest''Linear SVM' 'Simulated'
+models_to_run_obj = [xgboost] #The python objects of the sklearn class
+models_dic = {'XGBoost': xgboost,
+              'Linear SVM': svm_m,
+              'Random Forest': random_forest,
+              'Balanced random forest':balanced_random_forest,
+              'SGD': sgd,
+              'Bayes': naive_bayes,
+              'Simulated': simulator
+              }
 
-models_to_run = ['XGBoost'] #'xgboost'
-models_to_run_obj = [xgboost]
-models_dic = {'XGBoost': xgboost}
+EVENT_TYPES = ['RonO', 'RonS', 'Spikes', 'Fast RonO', 'Fast RonS', 'Sharp Spikes'] #confirmar
+HFO_TYPES = ['RonO', 'RonS', 'Fast RonO', 'Fast RonS'] #confirmar
+HFO_SUBTYPES = ['slow', 'delta', 'theta', 'spindle', 'spike'] #confirmar ordenadas
 
 electrodes_query_fields = ['patient_id', 'age', 'file_block', 'electrode',
                            'loc1', 'loc2', 'loc3', 'loc4', 'loc5',
@@ -38,18 +51,29 @@ all_patient_names = ['2061', '3162', '3444', '3452', '3656', '3748', '3759', '37
                      'IO024', 'IO025', 'IO027', 'M0423', 'M0580', 'M0605', 'M0761', 'M0831', 'M1056', 'M1072', 'M1264']
 
 
+removed_cause_was_in_both = 'IO017'
 intraop_patients = ['IO001io', 'IO002io', 'IO005io', 'IO006io', 'IO008io', 'IO009io', 'IO010io', 'IO011io', 'IO012io',
-                    'IO013io', 'IO015io', 'IO017', 'IO017io', 'IO018io', 'IO021io', 'IO022io', 'M0423', 'M0580',
+                    'IO013io', 'IO015io', 'IO017io', 'IO018io', 'IO021io', 'IO022io', 'M0423', 'M0580',
                     'M0605', 'M0761', 'M0831', 'M1056', 'M1072', 'M1264']
-
 non_intraop_patients = ['2061', '3162', '3444', '3452', '3656', '3748', '3759', '3799', '3853', '3900', '3910', '3943',
                         '3967', '3997', '4002', '4009', '4013', '4017', '4028', '4036', '4041', '4047', '4048', '4050',
                         '4052', '4060', '4061', '4066', '4073', '4076', '4077', '4084', '4085', '4089', '4093', '4099',
                         '4100', '4104', '4110', '4116', '4122', '4124', '4145', '4150', '4163', '4166', '448', '449',
                         '451', '453', '454', '456', '458', '462', '463', '465', '466', '467', '468', '470', '472',
                         '473', '474', '475', '477', '478', '479', '480', '481', '729', '831', 'IO001', 'IO002', 'IO004',
-                        'IO005', 'IO006', 'IO008', 'IO009', 'IO010', 'IO012', 'IO013', 'IO014', 'IO015', 'IO017',
+                        'IO005', 'IO006', 'IO008', 'IO009', 'IO010', 'IO012', 'IO013', 'IO014', 'IO015',
                         'IO018', 'IO019', 'IO021', 'IO022', 'IO023', 'IO024', 'IO025', 'IO027']
 
-# 25% of hippocampus query created with get_balanced_partition method='deterministic'
-validation_pat_names = ['4122', 'IO014', '3759', '478', 'IO013', '4050', '467', 'IO005', 'IO004', '451', '456']
+# 25% of hippocampus RonS patinets query randomly selected
+hip_rons_validation_names = ['3997', 'IO001', '463', '4099', '466', 'IO025', '458', 'IO027', 'IO002', '480', '454']
+
+color_list = [ 'blue', 'green', 'magenta', 'yellow', 'lightcyan', 'black', 'mediumslateblue', 'lime', 'darkviolet', 'gold']
+
+
+#BUG REPORT
+# {'RonO_evt_SOZ_disagreement': 76539,
+# 'RonS_evt_SOZ_disagreement': 6513,
+# 'Spikes_evt_SOZ_disagreement': 1411,
+# 'Fast RonO_evt_SOZ_disagreement': 3971,
+# 'Fast RonS_evt_SOZ_disagreement': 1314,
+# 'Sharp Spikes_evt_SOZ_disagreement': 133}

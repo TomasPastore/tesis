@@ -1,18 +1,6 @@
-import copy
-
-from pymongo import MongoClient
-import numpy as np
 
 # Classes
-from config import EVENT_TYPES, HFO_TYPES, HFO_SUBTYPES, models_to_run, hfo_query_fields
-from utils import encode_type_name
-
-
-class Database(object):
-    @staticmethod
-    def get_connection():
-        return MongoClient("mongodb://localhost:27017")
-
+from config import EVENT_TYPES, HFO_TYPES, models_to_run
 
 class Patient():
     def __init__(self, id, age):
@@ -48,25 +36,48 @@ class Patient():
                     negative_class_count +=1
         return negative_class_count, positive_class_count, tot_count
 
+    # Returns true iff the electrode has soz activity in loc_name
+    def has_epilepsy_in_loc(self, granularity, loc_name):
+        if granularity == 0:  # Has epilepsy in any part of the brain
+            return any([e.soz for e in self.electrodes])  # assumes that e.soz is already parsed
+        else: # looks if any soz electrode matches its loc_name in the correct granularity tags
+            return any([e.soz and getattr(e, e.loc_field_by_granularity(granularity)) == loc_name for e in self.electrodes])
 
+    def has_epilepsy_in_all_locs(self, granularity, locations):
+        return all([self.has_epilepsy_in_loc(granularity, location) for location in locations])
 
+    # Iff all electrodes are loc field is inside the list allowed, given as parameter locations
+    # "empty" in locations allows null elements
+    def has_epilepsy_restricted_to(self, granularity, locations):
+        if granularity == 0 :
+            return True
+        else:
+            restricted = True
+            for e in self.electrodes:
+                if e.soz and getattr(e, e.loc_field_by_granularity(granularity)) not in locations:
+                    restricted = False
+                    break
+            return restricted
 class Electrode():
 
-    def __init__(self, name, soz, blocks, soz_sc=None, events=None, loc1='empty', loc2='empty', loc3='empty', loc4='empty', loc5='empty'):
+    def __init__(self, name, soz, blocks, x, y, z,
+                 soz_sc=None, events=None, loc1='empty', loc2='empty', loc3='empty', loc4='empty', loc5='empty'):
         if events is None:
             events = {type: [] for type in EVENT_TYPES}
         self.name = name
         self.soz = soz
-        self.blocks = blocks
         self.soz_sc = soz_sc
-        self.events = events
+        self.blocks = blocks
+        self.x = x
+        self.y = y
+        self.z = z
         self.loc1 = loc1
         self.loc2 = loc2
         self.loc3 = loc3
         self.loc4 = loc4
         self.loc5 = loc5
-        self.evt_count = {type: {} for type in EVENT_TYPES}
-        self.pevt_count = {type: 0 for type in EVENT_TYPES}
+        self.events = events
+        self.evt_count = {type: {} for type in EVENT_TYPES} #TODO METHOD
 
     def add(self, event):
         self.events[event.info['type']].append(event)
@@ -75,14 +86,10 @@ class Electrode():
         for event_type in event_types:
             for block in self.evt_count[event_type].keys():
                 self.evt_count[event_type][block] = 0
-            self.pevt_count[event_type] = 0
 
             for evt in self.events[event_type]:
                 self.evt_count[event_type][evt.info['file_block']] +=1
-                if evt.info['soz']:
-                    self.pevt_count[event_type] += 1
 
-    #TODO agregar a notas de tesis que es importante detallar como calculamos el hfo rate
     # Gives you the event rate per minute considering events iff it is of any type of the ones listed
     # in event_types
     def get_events_rate(self, event_types=EVENT_TYPES):
@@ -103,57 +110,8 @@ class Electrode():
                 result += count
         return result
 
-    def has_pevent(self, event_types=HFO_TYPES):
-        for event_type in event_types:
-            if self.pevt_count[event_type] > 0:
-                return True
-        return False
-
-    # Devuelve la proporcion de eventos patologicos que captura la seleccion de event_types sobre el total de phfos de todos los tipos.
-    # Si no hay ningun phfo levanta una excepcion para no considerar al electrodo ya que no habia nada que capturar
-    # Recall de phfos
-    def phfo_capture_score(self, event_types, hfo_collection, tot_event_filter, pat_id):
-        assert (all([e in HFO_TYPES for e in event_types]))
-        tot_event_filter['patient_id'] = pat_id
-        tot_event_filter['electrode'] = self.name
-        tot_event_filter['soz'] = '1'
-        tot_event_filter['type'] = {'$in': [encode_type_name(e) for e in HFO_TYPES]}
-
-        if '$or' in tot_event_filter.keys():
-            del tot_event_filter['$or']
-
-        tot = hfo_collection.find(filter=tot_event_filter, projection=[]).count()
-        captured_count = sum([self.pevt_count[e_type] for e_type in event_types])
-        #captured_scores_arr = [self.pevt_count[e_type]/tot if tot > 0 else 1 for e_type in HFO_TYPES]
-        #print('Capture score debug')
-        #print(captured_scores_arr)
-        #s = sum(captured_scores_arr)
-        #print(s)
-        if tot > 0:
-            score = captured_count / tot
-            print(
-                'Patient {0} Electrode {1} capture score --> {2} out of {3} phfos of all HFO categories. Score: {4}'.format(
-                    pat_id,
-                    self.name,
-                    captured_count,
-                    tot,
-                    score,
-            ))
-            return score
-        else:
-            raise RuntimeWarning('There are no phfos in this channel. Do not consider capture score.')
-
-    # Devuelve la proporcion de patologicos capturados en el electrodo
-    # La hipotesis es que entre mayor sea para los que tienen algun phfo, mejor andara el hfo rate
-    # Los que no tienen ningun phfo no son considerados porque tendrian hfo rate 0 con filtro perfecto y eso clasificaria bien igual
-    def pevent_proportion_score(self, event_types): #Precision de pevents
-        tot = sum([sum([v for v in self.evt_count[e_type].values()]) for e_type in event_types])
-        pevents = sum([self.pevt_count[e_type] for e_type in event_types])
-        prop = pevents / tot if tot>0 else 1
-        empty = tot==0
-        print('Canal sin ningun hfo')
-        # print('In electrode {0} {1} out of {2} captured events are pathologic. E-soz: {3} . Score: {4}'.format(self.name, pevents, tot, self.soz, prop))
-        return prop, empty
+    def loc_field_by_granularity(self, granularity):
+        return 'loc{i}'.format(i=granularity)
 
     def print(self):
         print('\t\tPrinting electrode {0}'.format(self.name))

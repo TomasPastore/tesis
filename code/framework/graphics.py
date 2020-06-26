@@ -1,16 +1,26 @@
+import copy
 from decimal import Decimal
+import getpass
+from sys import version as py_version
 
 import numpy as np
 import math as mt
 import sklearn.metrics as metrics
 from matplotlib import pyplot as plt, colors
+import plotly.graph_objects as go
+from sklearn.metrics import auc, roc_curve, precision_recall_curve, average_precision_score, plot_precision_recall_curve
 
-from config import EVENT_TYPES, intraop_patients, HFO_TYPES
-from utils import angle_clusters, get_matlab_session, get_granularity
+from config import EVENT_TYPES, intraop_patients, HFO_TYPES, color_list, models_to_run, models_dic
+from models import estimators
+running_py_3_5 = py_version[2] == '5'
+if running_py_3_5:
+    import angle_clusters, get_matlab_session
+from db_parsing import get_granularity
 import matplotlib.style as mplstyle
 # mplstyle.use(['ggplot', 'fast'])
 
-def encode_type_name(name): #TODO sacar
+
+def encode_type_name(name):
     return str(EVENT_TYPES.index(name) + 1)
 
 # Graphics for analysis
@@ -25,8 +35,8 @@ def parse_elec_name(doc):
 
 
 # Graphics for results
+def event_rate_by_loc(hfo_type_data_by_loc, zoomed_type=None, metrics=['pse', 'pnee', 'auc'], title=None, colors=None, conf=None):
 
-def event_rate_by_loc(hfo_type_data_by_loc, zoomed_type=None, metrics=['pewp', 'cs', 'ps', 'ms', 'auc']):
     fig = plt.figure(107)
 
     # Subplots frames
@@ -48,84 +58,107 @@ def event_rate_by_loc(hfo_type_data_by_loc, zoomed_type=None, metrics=['pewp', '
 
     subplot_index = 1
     if zoomed_type is None:
-        fig.suptitle('Event types\' rate (events per minute)')
+        title = 'Event types\' rate (events per minute)' if title is None else title
+        fig.suptitle(title, size=14)
     else:
         fig.suptitle('{0} subtypes\' rate (events per minute)'.format(zoomed_type))
-
     for loc, rate_data_by_type in hfo_type_data_by_loc.items():
+        elec_count = None
         axe = plt.subplot('{r}{c}{i}'.format(r=rows, c=cols, i=subplot_index))
+        title = '{l}'.format(l=loc)
         plot_data = {type: {} for type in rate_data_by_type.keys()}
         for type, rate_data in rate_data_by_type.items():
-            plot_data[type]['labels'] = rate_data['soz_labels']
             plot_data[type]['preds'] = rate_data['evt_rates']
+            plot_data[type]['labels'] = rate_data['soz_labels']
             plot_data[type]['legend'] = '{t}.'.format(t=type)
             scores = {}
             if 'ec' in metrics:
-                scores['EC'] = rate_data['evt_count']
-            if 'pewp' in metrics:
-                scores['PEWP'] = rate_data['p_elec_with_pevts']
-            if 'ps' in metrics:
-                scores['PS'] = round(rate_data['proportion_score'], 2)
+                scores['ec'] = rate_data['evt_count']
+            if 'pse' in metrics:
+                scores['pse'] = rate_data['pse']
+            if 'pnee' in metrics:
+                scores['pnee'] = rate_data['pnee']
             if 'auc' in metrics:
                 scores['AUC_ROC'] = round(rate_data['AUC_ROC'], 2)
-
-            if type not in ['Spikes', 'Sharp Spikes']:
-                if 'cs' in metrics:
-                    scores['CS'] = round(rate_data['capture_score'], 2)
-                if 'ms' in metrics:
-                    scores['MS'] = round(rate_data['metric_score'], 2)
-            else:
-                if 'cs' in metrics:
-                    scores['CS'] = 'X'
-                if 'ms' in metrics:
-                    scores['MS'] = 'X'
-
+            if 'Simulated' in type:
+                scores['conf'] = rate_data['conf']
             plot_data[type]['scores'] = scores
-            title = '{l}'.format(l=loc)
-        print('Plot data {0}'.format(plot_data))
-        superimposed_rocs(plot_data, title, axe, rate_data['elec_count'])
+
+            if elec_count is None:
+                elec_count = rate_data['elec_count']
+            elif elec_count != rate_data['elec_count']:
+                print('Elec count of type {0}: {1}, other elec_count {2}'.format(
+                    type, rate_data['elec_count'], elec_count) )
+                raise RuntimeError('Elec count disagreement among types in ROCs plot')
+
+        superimposed_rocs(plot_data, title, axe, elec_count, colors)
         subplot_index += 1
     plt.subplots_adjust(wspace=0.4, hspace=0.4)
+    #plt.savefig("/home/tpastore/simulator_{0}.png".format(conf), bbox_inches='tight')
     plt.show()
 
-
-def superimposed_rocs(plot_data, title, axe, elec_count):
-    axe.set_title(title, fontdict={'fontsize': 10}, loc='left')
+# Plots the ROCs of many types in a location given in plot_data, modifies the axe object
+# It also may build tables of the global info in that location if you uncomment that piece of code
+def superimposed_rocs(plot_data, title, axe, elec_count, colors=None):
+    axe.set_title(title, fontdict={'fontsize': 12}, loc='left')
     axe.plot([0, 1], [0, 1], 'r--')
     axe.set_xlim([0, 1])
     axe.set_ylim([0, 1])
-    axe.set_ylabel('True Positive Rate')
-    axe.set_xlabel('False Positive Rate')
-    colors = ['b', 'g', 'c', 'm', 'y', 'k', 'lightcoral', 'mediumslateblue']
-
+    axe.set_ylabel('True Positive Rate', fontdict={'fontsize': 12})
+    axe.set_xlabel('False Positive Rate', fontdict={'fontsize': 12})
     # calculate the fpr and tpr for all thresholds of the classification
-    roc_data = []
+    roc_data, pses = [], []
     for type, info in plot_data.items():
         fpr, tpr, threshold = metrics.roc_curve(info['labels'], info['preds'])
-        roc_data.append((type, fpr, tpr, info['scores']['AUC_ROC']))
+        confidence = info['scores']['conf'] if 'Simulated' in type else None
+        if 'pse' in info['scores'].keys():
+            pses.append(info['scores']['pse'])
+        roc_data.append((type, fpr, tpr, info['scores']['AUC_ROC'], confidence))
 
-    roc_data.sort(key=lambda x: x[3], reverse=True)
-    columns = []
-    rows = []
-    for t, fpr, tpr, auc in roc_data:
-        legend = plot_data[t]['legend'] + ' AUC_ROC %.2f' % auc
-        axe.plot(fpr, tpr, color_for(t), label=legend)
-        columns = [title] + [k for k in ['EC', 'PEWP', 'CS', 'PS', 'MS', 'AUC_ROC'] if
-                             k in plot_data[t]['scores'].keys()]
-        rows.append([t] + [str(plot_data[t]['scores'][k]) for k in ['EC', 'PEWP', 'CS', 'PS', 'MS', 'AUC_ROC'] if
+    roc_data.sort(key=lambda x: x[3], reverse=True) #Orders descendent by AUC
+    if len(pses) > 0:
+        pse = pses[0]
+        for e in pses:
+            if e != pse:
+                #This shouldnt happen, soz electrodes should be independent of the type of them
+                raise RuntimeError('SOZ electrode percentage disagreement among evt types of the same location')
+
+    columns, rows = [], []
+    i = 0
+
+    #For each type
+    for t, fpr, tpr, auc, conf in roc_data:
+        legend = plot_data[t]['legend'] + ' AUC_ROC %.2f.' % auc
+        axe.plot(fpr, tpr, color_for(t) if colors is None else color_list[i], label=legend)
+
+        #Building report tables
+        rows.append([t] + [str(plot_data[t]['scores'][k]) for k in ['ec', 'pse', 'pnee', 'AUC_ROC'] if
                            k in plot_data[t]['scores'].keys()])
-    axe.legend(loc='lower right', prop={'size': 7})
-    axe.text(0.03, 0.92, 'Elec Count: {0}'.format(elec_count), bbox=dict(facecolor='grey', alpha=0.5),
-             transform=axe.transAxes, fontsize=8)
+        i+=1
 
-    plot_score_in_loc_table(columns, rows)
+    axe.legend(loc='lower right', prop={'size': 10}) #TODO  HACER MAS GRANDE
+    info_text = 'Elec Count: {0}'.format(elec_count)
+    plot_pse_text = True
+    if len(pses) > 0 and plot_pse_text:
+        info_text = info_text + '\nPSE:            {0}'.format(np.mean(pses))
+    axe.text(0.03, 0.88, info_text, bbox=dict(facecolor='grey', alpha=0.5),
+             transform=axe.transAxes, fontsize=10)
+
+    columns = [title] + [k for k in ['ec', 'pse', 'pnee', 'AUC_ROC'] if
+                         k in plot_data[t]['scores'].keys()] #Title here is the location
+
+    plot_score_in_loc_table(columns, rows, colors)
 
     # method II: ggplot
     # df = pd.DataFrame(dict(fpr = fpr, tpr = tpr))
     # ggplot(df, aes(x = 'fpr', y = 'tpr')) + geom_line() + geom_abline(linetype = 'dashed')
 
-
 def color_for(t):
+    if 'RonS baseline model_pat' == t:
+        return 'blue'
+    if 'FPR' in t:
+        colors = ['darkred', 'firebrick', 'red', 'indianred', 'lightcoral', 'aquamarine', 'springgreen', 'limegreen', 'green', 'darkgreen']
+        return colors[int(t[-1])]
     if t == 'HFOs':
         return 'b'
     if t == 'RonO':
@@ -140,6 +173,8 @@ def color_for(t):
         return 'c'
     if t == 'Sharp Spikes':
         return 'k'
+    if t == 'Spikes + Sharp Spikes':
+        return 'magenta'
     if t == 'Filtered RonO':
         return 'mediumslateblue'
     if t == 'Filtered RonS':
@@ -149,8 +184,7 @@ def color_for(t):
     if t == 'Filtered Fast RonS':
         return 'gold'
 
-    print('No deberia llegar aca')
-    print(t)
+    raise ValueError('graphics.color_for is undefined for type: {0}'.format(t))
 
 def table_color_for(t):
     if t == 'HFOs':
@@ -167,6 +201,8 @@ def table_color_for(t):
         return 'lightcyan'
     if t == 'Sharp Spikes':
         return 'black'
+    if t == 'Spikes + Sharp Spikes':
+        return 'magenta'
     if t == 'Filtered RonO':
         return 'mediumslateblue'
     if t == 'Filtered RonS':
@@ -175,9 +211,7 @@ def table_color_for(t):
         return 'darkviolet'
     if t == 'Filtered Fast RonS':
         return 'gold'
-
-    print('No deberia llegar aca, table color for')
-    print(t)
+    raise ValueError('graphics.table_color_for is undefined for type: {0}'.format(t))
 
 def color_by_gran(granularity):
     if granularity == 0:
@@ -192,11 +226,10 @@ def color_by_gran(granularity):
         raise RuntimeError('Undefined color for granularity {0}'.format(granularity))
 
 
-def plot_score_in_loc_table(columns, rows):
-    import plotly.graph_objects as go
-    col_colors = [table_color_for(t) for t in sorted([r[0] for r in rows])]
+def plot_score_in_loc_table(columns, rows, colors):
+    col_colors = [table_color_for(t) if colors is None else color_list[i] for i, t in enumerate(sorted([r[0] for r in rows]))]
     font_colors = ['black' if c != 'blue' else 'white' for c in col_colors]
-    rows = sorted(rows, key=lambda x: x[0])
+    rows = sorted(rows, key=lambda x: x[0]) #Order by HFO type name
     fig = go.Figure(
         data=[go.Table(
             header=dict(
@@ -210,11 +243,23 @@ def plot_score_in_loc_table(columns, rows):
                 align='left', font=dict(color=[font_colors for i in range(len(columns))], size=12)
             ))
         ])
+
+    fig.update_layout(
+        autosize=False,
+        width=500,
+        height=500,
+        margin=dict(
+            l=50,
+            r=50,
+            b=100,
+            t=100,
+            pad=4
+        ))
     fig.show()
 
 
 
-def plot_score_table(t1, name):
+def plot_score_table(t1):
     import plotly.graph_objects as go
     np.random.seed(1)
     col_colors = []
@@ -234,6 +279,7 @@ def plot_score_table(t1, name):
 
     fig = go.Figure(
         data=[go.Table(
+            columnwidth=[200, 300, 200, 200, 200, 200],
             header=dict(
                 values=['<b>Granularity</b>', '<b>location</b>', '<b>Fast RonO</b>',
                         '<b>Fast RonS</b>', '<b>RonO</b>', '<b>RonS</b>'],
@@ -246,11 +292,9 @@ def plot_score_table(t1, name):
                 align='left', font=dict(color='black', size=8)
             ))
         ])
-
+    fig.update_layout(width=1300)
     fig.show()
-
-
-def plot_co_metric_auc(m_tab, a_tab):
+def plot_co_metric_auc_0(m_tab, a_tab):
     ms = []
     aucs = []
     for loc in m_tab.keys():
@@ -265,13 +309,249 @@ def plot_co_metric_auc(m_tab, a_tab):
     plt.plot(X_plot, m * X_plot + b, '-')
     plt.xlabel('Pathologic score')
     plt.ylabel('AUC ROC7')
-    plt.title('Metric and AUC ROC correlation')
-    plt.savefig("/home/tpastore/metric_auc_correlation.png", bbox_inches='tight')
+    plt.title('Pathologic score and AUC ROC correlation')
+    plt.savefig("/home/tpastore/pscore_auc_correlation.png", bbox_inches='tight')
+    plt.show()
+
+def plot_co_metrics_auc(prop_tab, pewp_tab, auc_tab):
+
+    grid = {}
+    for t in HFO_TYPES:
+        proportions = []
+        pewp = []
+        aucs = []
+        for loc in prop_tab.keys():
+            proportions.append(prop_tab[loc][t] if prop_tab[loc][t] < 1 else 0.99 )
+            pewp.append(pewp_tab[loc][t] if pewp_tab[loc][t] < 1 else 0.99)
+            aucs.append(auc_tab[loc][t] if auc_tab[loc][t] < 1 else 0.99)
+
+        min_prop, max_prop = min(proportions), max(proportions)
+
+        type_grid = {round(i,2) : {round(j,2):[] for j in np.arange(0, 0.5, 0.05)}
+                     for i in np.arange(0 ,0.6, 0.1)}
+        print('Init type gride {0}'.format(type_grid))
+        for i in range(len(proportions)):
+            p, pw, auc = proportions[i], pewp[i], aucs[i]
+            pw_box =  round(  ( (pw*100) - ((pw*100) % 5) ) /100, 2)
+            p_box = round( (p*100 - ((p*100) % 10)) / 100, 2)
+            type_grid[p_box][pw_box].append(auc)
+        print('GRID BEFORE AVERAGE')
+        print(type_grid)
+        for f, f_cols in type_grid.items():
+            for c, aucs in f_cols.items():
+                type_grid[f][c] = np.mean(aucs) if len(aucs)>0 else 0
+        print('GRID AFTER AVERAGE')
+        print(type_grid)
+        grid[t]= type_grid
+    heat_map = [[0 for i in range(10)] for j in range(6)]
+    for h in HFO_TYPES:
+        for f, fcols in grid[h].items():
+            for col, auc in fcols.items():
+                heat_map[int(f / 0.1)][int(col / 0.05)]= auc
+
+        fig = go.Figure(data=go.Heatmap(
+            z=heat_map))
+        fig.show()
+        '''
+        fig = plt.figure()
+        fig.suptitle('{0} pHFO and HFO rate AUC relation'.format(h))
+        axes = fig.gca()
+        axes.set_xlabel('PEWP (proportion of elec with pHFO)')
+        axes.set_ylabel('pHFO proportion')
+        axes.tick_params(grid_color='k', grid_alpha=0.5)
+        weights = []
+        x = []
+        y = []
+        for f, fcols in grid[h].items():
+            for col, auc in fcols.items():
+                x.append(col + 0.025)
+                y.append(f  + 0.05)
+                weights.append(auc)
+        pw_blocks = np.arange(0, 0.55, 0.05)
+        prop_blocks = np.arange(0, 1.1, 0.1)
+        hist, xedges, yedges, image = plt.hist2d(x, y, bins=[pw_blocks, prop_blocks], cmap=plt.cm.jet, label='Baseline HFO rate AUC-ROC')
+        print('hist, xedges, yedges')
+        print(hist)
+        print(xedges)
+        print(yedges)
+        axes.legend(loc='lower right', prop={'size': 7})
+        plt.colorbar()
+        plt.savefig("/home/tpastore/metrics_auc_correlation.png", bbox_inches='tight')
+        plt.show()
+        '''
+
+
+
+##################     Plotting ML results ROCS and PRE_REC          #######################
+def axes_by_model(plt, models_to_run):
+    subplot_count = len(models_to_run) * 2
+    if subplot_count == 2:
+        rows = 2
+        cols = 1
+    elif subplot_count == 4:
+        rows = 2
+        cols = 2
+    elif subplot_count == 6:
+        rows = 2
+        cols = 3
+    elif subplot_count == 8:
+        rows = 2
+        cols = 4
+    else:
+        raise RuntimeError('Subplot count not implemented')
+    axes = {}
+    subplot_index = 1
+    for m in models_to_run:
+        if m not in axes.keys():
+            axes[m] = {}
+        axes[m]['ROC'] = plt.subplot('{r}{c}{i}'.format(r=rows, c=cols, i=subplot_index))
+        subplot_index += 1
+    for m in models_to_run:
+        axes[m]['PRE_REC'] = plt.subplot('{r}{c}{i}'.format(r=rows, c=cols, i=subplot_index))
+        subplot_index += 1
+    return axes
+
+
+def plot_roc_fold(fpr, tpr, model_name, plot_axe, mean_fpr, tprs, aucs, fold):
+    curve_kind = 'ROC'
+    interp_tpr = np.interp(mean_fpr, fpr, tpr)
+    tprs[model_name].append(interp_tpr)
+    tprs[model_name][-1][0] = 0.0
+
+    roc_auc = auc(fpr, tpr)
+    aucs[model_name][curve_kind].append(roc_auc)
+    plot_axe[model_name][curve_kind].plot(fpr, tpr, lw=1, alpha=0.3,
+                                          label='Fold %d (AUC = %0.2f)' % (fold, roc_auc))
+
+def average_ROCs(model_name, plot_axe, mean_fpr, tprs, aucs):
+    curve_kind = 'ROC'
+    plot_axe[model_name][curve_kind].plot([0, 1], [0, 1], linestyle='--', lw=2, color='r', label='Chance', alpha=.8)
+
+    mean_tpr = np.mean(tprs[model_name], axis=0)
+    mean_tpr[-1] = 1.0
+    mean_auc = auc(mean_fpr, mean_tpr)
+    std_auc = np.std(aucs[model_name][curve_kind])
+    plot_axe[model_name][curve_kind].plot(mean_fpr, mean_tpr, color='b',
+                                          label=r'Mean ROC (AUC = %0.2f $\pm$ %0.2f)' % (mean_auc, std_auc),
+                                          lw=2, alpha=.8)
+
+    std_tpr = np.std(tprs[model_name], axis=0)
+    tprs_lower = np.maximum(mean_tpr - std_tpr, 0)
+    tprs_upper = np.minimum(mean_tpr + std_tpr, 1)
+    plot_axe[model_name][curve_kind].fill_between(mean_fpr, tprs_lower, tprs_upper, color='grey', alpha=.2,
+                                                  label=r'$\pm$ 1 std. dev.')
+
+    plot_axe[model_name][curve_kind].set_xlim([-0.05, 1.05])
+    plot_axe[model_name][curve_kind].set_ylim([-0.05, 1.05])
+    plot_axe[model_name][curve_kind].set_xlabel('False Positive Rate')
+    plot_axe[model_name][curve_kind].set_ylabel('True Positive Rate')
+    plot_axe[model_name][curve_kind].set_title('{0} ROC curves'.format(model_name))
+    plot_axe[model_name][curve_kind].legend(loc="lower right")
+
+
+# PRE REC
+
+def plot_pre_rec_fold(recall, precision, model_name, plot_axe, mean_recall, prec, aucs, fold, average_precision):
+    curve_kind = 'PRE_REC'
+    interp_prec = np.interp(mean_recall, copy.deepcopy(recall), copy.deepcopy(precision))
+    prec[model_name].append(interp_prec)
+    prec[model_name][-1][0] = 1
+    auc_v = auc(recall, precision)
+    #precision = [1] + precision
+    #recall = [0] + recall
+
+    aucs[model_name][curve_kind].append(auc_v)
+    plot_axe[model_name][curve_kind].plot(recall, precision, lw=1, alpha=0.3,
+                                          label='Fold %d (AUC = %0.2f. AP = %0.2f.)' % (fold, auc_v, average_precision))
+
+
+def average_pre_rec(model_name, plot_axe, mean_recall, prec, aucs, aps):
+    curve_kind = 'PRE_REC'
+    mean_prec = np.mean(prec[model_name], axis=0)
+    mean_auc = auc(mean_recall, mean_prec)
+    std_auc = np.std(aucs[model_name][curve_kind])
+    mean_ap = np.mean(aps[model_name])
+    std_ap = np.std(aps[model_name])
+
+    plot_axe[model_name][curve_kind].plot(mean_recall, mean_prec, color='b',
+                                          label=r'Mean PRE_REC (AUC = %0.2f $\pm$ %0.2f. AP = %0.2f $\pm$ %0.2f)' % (
+                                              mean_auc, std_auc, mean_ap, std_ap),
+                                          lw=2, alpha=.8)
+
+    std_prec = np.std(prec[model_name], axis=0)
+    prec_lower = np.maximum(mean_prec - std_prec, 0)
+    prec_upper = np.minimum(mean_prec + std_prec, 1)
+    plot_axe[model_name][curve_kind].fill_between(mean_recall, prec_lower, prec_upper, color='grey', alpha=.2,
+                                                  label=r'$\pm$ 1 std. dev.')
+
+    plot_axe[model_name][curve_kind].set_xlim([-0.05, 1.05])
+    plot_axe[model_name][curve_kind].set_ylim([-0.05, 1.05])
+    plot_axe[model_name][curve_kind].set_xlabel('Recall')
+    plot_axe[model_name][curve_kind].set_ylabel('Precision')
+    plot_axe[model_name][curve_kind].set_title('{0} Precision-Recall curves'.format(model_name))
+    plot_axe[model_name][curve_kind].legend(loc="lower right")
+
+##################     Plotting ML results ROCS and PRE_REC          #######################
+
+
+def plot_pre_rec_fold_2(i, fold, ax, mean_recall, prec, aucs, aps, hfo_type_name, model_name):
+    precision, recall, thresholds = precision_recall_curve(fold['test_labels'], fold[model_name]['probs'])
+    ap = average_precision_score(fold['test_labels'], fold[model_name]['probs'])
+    aps[model_name].append(ap)
+    rev_precision = np.array(list(reversed(list(precision))))
+    rev_recall = np.array(list(reversed(list(recall))))
+    interp_prec = np.interp(mean_recall, copy.deepcopy(rev_recall), copy.deepcopy(rev_precision))
+    prec[model_name].append(interp_prec)
+    prec[model_name][-1][0] = 1
+    auc_v = auc(recall, precision)
+    aucs[model_name]['PRE_REC'].append(auc_v)
+    label = 'Fold %d (AUC = %0.2f. AP = %0.2f.)' % (i, auc_v, ap)
+    model_func = models_dic[model_name]
+    clf_preds, clf_probs, clf = model_func(fold['train_features'], fold['train_labels'], fold['test_features'],
+                                      feature_list=fold['feature_names'], hfo_type_name=hfo_type_name)
+    plot_precision_recall_curve(estimator= clf, X=fold['test_features'], y=fold['test_labels'], name=label, ax=ax )
+
+def ml_training_plot(folds, loc, hfo_type_name, roc=True, pre_rec=True, models_to_run= models_to_run):
+    fig = plt.figure()
+    fig.suptitle('Phfo models in {0}'.format(loc), fontsize=16)
+    mean_fpr = np.linspace(0, 1, 100)
+    mean_recall = np.linspace(0, 1, 100)
+
+    tprs = {m: [] for m in models_to_run}
+    prec = {m: [] for m in models_to_run}
+    aucs = {m: {'PRE_REC':[], 'ROC':[]} for m in models_to_run}
+    aps = {m: [] for m in models_to_run}
+
+    plot_axe = axes_by_model(plt, models_to_run)
+    for model_name in models_to_run:
+        for i, fold in enumerate(folds):
+            # ROC
+            fpr, tpr, thresholds = roc_curve(fold['test_labels'], fold[model_name]['probs'])
+            plot_roc_fold(fpr, tpr, model_name, plot_axe, mean_fpr, tprs, aucs, i)
+
+            # PRE REC
+            if model_name == 'Simulated':
+                precision, recall, thresholds = precision_recall_curve(fold['test_labels'], fold[model_name]['probs'])
+                precision = np.array(list(reversed(list(precision))))
+                recall = np.array(list(reversed(list(recall))))
+                #thesholds = np.array(list(reversed(list(thresholds))))
+                ap = average_precision_score(fold['test_labels'], fold[model_name]['probs'])
+                aps[model_name].append(ap)
+                plot_pre_rec_fold(recall, precision, model_name, plot_axe, mean_recall, prec, aucs, i, ap)
+            else:
+                plot_pre_rec_fold_2(i, fold, plot_axe[model_name]['PRE_REC'], mean_recall, prec, aucs, aps, hfo_type_name, model_name)
+        average_ROCs(model_name, plot_axe, mean_fpr, tprs, aucs)
+        average_pre_rec(model_name, plot_axe, mean_recall, prec, aucs, aps)
+
+    #plt.savefig('/home/{user}/{type}_phfo_model_comparison_{loc}.png'.format(user=getpass.getuser(), type=hfo_type_name,
+    #                                                                         loc=loc), format='png')
     plt.show()
 
 
-def feature_importances(feature_list, importances, hfo_type_name, fig_id):
-    fig = plt.figure(fig_id)
+
+
+def feature_importances(feature_list, importances, hfo_type_name):
+    fig = plt.figure()
     axe = plt.subplot(111)
     # plt.style.use('fivethirtyeight')
 
@@ -291,38 +571,36 @@ def feature_importances(feature_list, importances, hfo_type_name, fig_id):
     axe.set_xlabel('Variable')
     plt.show()
 
-
-def hfo_rate_histogram(data, title):
+def hfo_rate_histogram_red_green(red, green, title, bins=None):
     print('{0} Histogram'.format('HFO rate per electrode'))
-    fig = plt.figure(19)
-    weight_for_obs_i = 1. / len(data)
-    weights = [weight_for_obs_i] * len(data)  # Option 1
-
-    datas_not_0 = [x for x in data if x > 0]
-    min_rate = min(datas_not_0)
-    print('Min rate after 0: {0}'.format(min_rate))
-    n, bins, patches = plt.hist(
-        data,
-        bins=[0., 0.015] + list(np.linspace(0.015, 15, 150)),
+    fig = plt.figure()
+    weight_for_green = 1. / len(green)
+    weight_for_red = 1. / len(red)
+    weights = [[weight_for_green] * len(green), [weight_for_red] * len(red)]
+    axes = fig.gca()
+    n, bins, patches = axes.hist(
+        [green, red],
+        bins=bins,
         weights=weights,
         histtype='step',
-        color='r',
-        label='HFO rate'
+        color=['g','r'],
+        label=['NSOZ', 'SOZ'],
+        align='mid'
         # stacked=True,
     )
-    plt.legend(loc='upper right')
-    print(n)
-    x_label = 'HFO rate'
-    plt.xlabel(x_label)
-    plt.ylabel('Proportion of electrodes')
-    plt.title(title)
+    axes.set_xticks(np.arange(0, 80, 5))
+
+    axes.legend(loc='upper right', fancybox=True)
+    axes.set_xlabel('HFO rate')
+    axes.set_ylabel('Proportion of electrodes')
+    axes.set_title(title)
     plt.show()
 
-def histogram(data, title, label, x_label, bins=None):
+def histogram(data, title, x_label, bins=None):
     plt.figure()
     weight_for_obs_i = 1. / len(data)
     weights = [weight_for_obs_i] * len(data)
-    print('Phfo stats: {0}'.format(title))
+    print('Histogram...')
     print(sorted(data))
     print('Mean: {0}'.format(np.mean(data)))
     print('Std: {0}'.format(np.std(data)))
@@ -334,11 +612,9 @@ def histogram(data, title, label, x_label, bins=None):
         weights=weights,
         histtype='step',
         color='r',
-        label=label
         # stacked=True,
     )
     print(bins)
-    plt.legend(loc='upper right')
     plt.xlabel(x_label)
     plt.ylabel('Frequency')
     plt.title(title)
