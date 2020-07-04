@@ -58,25 +58,27 @@ def unique_patients(collection, crit):
     print(patient_ids)
     return patient_ids
 
-def print_info(info_evts):
+def print_info(info_evts, file):
     attributes_width = max(len(key) for key in info_evts.keys()) + 2  # padding
     header = '{attr} || {value}'.format(attr='Attributes'.ljust(attributes_width), value='Values')
     sep = ''.join(['-' for i in range(len(header))])
-    print(header)
-    print(sep)
+    print(header, file=file)
+    print(sep, file=file)
     for k, v in info_evts.items():
-        row = '{attr} || {value}'.format(attr=k.ljust(attributes_width), value=str(v))
-        print(row)
+        if k != 'soz_labels':
+            k, v = (k, v) if k != 'evt_rates' else ('mean_of_rates', np.mean(v))
+            row = '{attr} || {value}'.format(attr=k.ljust(attributes_width), value=str(v))
+            print(row, file=file)
 
     pat_coord_null = info_evts['pat_with_x_null'].union(info_evts['pat_with_y_null'])
     pat_coord_null = pat_coord_null.union(info_evts['pat_with_z_null'])
-    print('Count of patients with null coords: {0}'.format(len(pat_coord_null)))
-    print('List of patients with null coords: {0}'.format(pat_coord_null))
+    print('Count of patients with null coords: {0}'.format(len(pat_coord_null)), file=file)
+    print('List of patients with null coords: {0}'.format(pat_coord_null), file=file)
 
     pat_with_empty_loc = info_evts['pat_with_loc2_empty'].union(info_evts['pat_with_loc3_empty'])
     pat_with_empty_loc = pat_with_empty_loc.union(info_evts['pat_with_loc5_empty'])
-    print('Count of patients with empty loc: {0}'.format(len(pat_with_empty_loc)))
-    print('List of patients with empty loc: {0}'.format(pat_with_empty_loc))
+    print('Count of patients with empty loc: {0}'.format(len(pat_with_empty_loc)), file=file)
+    print('List of patients with empty loc: {0}'.format(pat_with_empty_loc), file=file)
 
 
 def all_subsets(ss):

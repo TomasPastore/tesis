@@ -1,6 +1,7 @@
 import copy
 from decimal import Decimal
 import getpass
+from pathlib import Path
 from sys import version as py_version
 
 import numpy as np
@@ -10,7 +11,7 @@ from matplotlib import pyplot as plt, colors
 import plotly.graph_objects as go
 from sklearn.metrics import auc, roc_curve, precision_recall_curve, average_precision_score, plot_precision_recall_curve
 
-from config import EVENT_TYPES, intraop_patients, HFO_TYPES, color_list, models_to_run, models_dic
+from config import EVENT_TYPES, intraop_patients, HFO_TYPES, color_list, models_to_run, models_dic, EXPERIMENTS_FOLDER
 from models import estimators
 running_py_3_5 = py_version[2] == '5'
 if running_py_3_5:
@@ -19,10 +20,12 @@ from db_parsing import get_granularity
 import matplotlib.style as mplstyle
 # mplstyle.use(['ggplot', 'fast'])
 
+#TODO MOVE TO DB PARSING
 
 def encode_type_name(name):
     return str(EVENT_TYPES.index(name) + 1)
 
+#TODO MOVE TO DB PARSING
 # Graphics for analysis
 def parse_elec_name(doc):
     if isinstance(doc['electrode'], list):
@@ -34,8 +37,11 @@ def parse_elec_name(doc):
     return e_name
 
 
-# Graphics for results
-def event_rate_by_loc(hfo_type_data_by_loc, zoomed_type=None, metrics=['pse', 'pnee', 'auc'], title=None, colors=None, conf=None):
+# 3) Predicting SOZ with rate
+
+# Plots ROCs for SOZ predictor by hfo rate for different locations and event types
+def event_rate_by_loc(hfo_type_data_by_loc, zoomed_type=None, metrics=['pse', 'pnee', 'auc'],
+                      title=None, colors=None, conf=None, saving_path= EXPERIMENTS_FOLDER):
 
     fig = plt.figure(107)
 
@@ -62,6 +68,7 @@ def event_rate_by_loc(hfo_type_data_by_loc, zoomed_type=None, metrics=['pse', 'p
         fig.suptitle(title, size=14)
     else:
         fig.suptitle('{0} subtypes\' rate (events per minute)'.format(zoomed_type))
+
     for loc, rate_data_by_type in hfo_type_data_by_loc.items():
         elec_count = None
         axe = plt.subplot('{r}{c}{i}'.format(r=rows, c=cols, i=subplot_index))
@@ -94,7 +101,9 @@ def event_rate_by_loc(hfo_type_data_by_loc, zoomed_type=None, metrics=['pse', 'p
         superimposed_rocs(plot_data, title, axe, elec_count, colors)
         subplot_index += 1
     plt.subplots_adjust(wspace=0.4, hspace=0.4)
-    #plt.savefig("/home/tpastore/simulator_{0}.png".format(conf), bbox_inches='tight')
+    for fmt in ['pdf', 'png', 'eps']:
+        saving_path_f = '{file_path}.{format}'.format(file_path=saving_path, format=fmt)
+        plt.savefig(saving_path_f, bbox_inches='tight')
     plt.show()
 
 # Plots the ROCs of many types in a location given in plot_data, modifies the axe object
@@ -140,7 +149,7 @@ def superimposed_rocs(plot_data, title, axe, elec_count, colors=None):
     info_text = 'Elec Count: {0}'.format(elec_count)
     plot_pse_text = True
     if len(pses) > 0 and plot_pse_text:
-        info_text = info_text + '\nPSE:            {0}'.format(np.mean(pses))
+        info_text = info_text + '\nPSE:            {0}'.format(round(np.mean(pses), 2))
     axe.text(0.03, 0.88, info_text, bbox=dict(facecolor='grey', alpha=0.5),
              transform=axe.transAxes, fontsize=10)
 
@@ -153,79 +162,7 @@ def superimposed_rocs(plot_data, title, axe, elec_count, colors=None):
     # df = pd.DataFrame(dict(fpr = fpr, tpr = tpr))
     # ggplot(df, aes(x = 'fpr', y = 'tpr')) + geom_line() + geom_abline(linetype = 'dashed')
 
-def color_for(t):
-    if 'RonS baseline model_pat' == t:
-        return 'blue'
-    if 'FPR' in t:
-        colors = ['darkred', 'firebrick', 'red', 'indianred', 'lightcoral', 'aquamarine', 'springgreen', 'limegreen', 'green', 'darkgreen']
-        return colors[int(t[-1])]
-    if t == 'HFOs':
-        return 'b'
-    if t == 'RonO':
-        return 'b'
-    if t == 'RonS':
-        return 'g'
-    if t == 'Fast RonO':
-        return 'm'
-    if t == 'Fast RonS':
-        return 'y'
-    if t == 'Spikes':
-        return 'c'
-    if t == 'Sharp Spikes':
-        return 'k'
-    if t == 'Spikes + Sharp Spikes':
-        return 'magenta'
-    if t == 'Filtered RonO':
-        return 'mediumslateblue'
-    if t == 'Filtered RonS':
-        return 'lime'
-    if t == 'Filtered Fast RonO':
-        return 'darkviolet'
-    if t == 'Filtered Fast RonS':
-        return 'gold'
-
-    raise ValueError('graphics.color_for is undefined for type: {0}'.format(t))
-
-def table_color_for(t):
-    if t == 'HFOs':
-        return 'blue'
-    if t == 'RonO':
-        return 'blue'
-    if t == 'RonS':
-        return 'green'
-    if t == 'Fast RonO':
-        return 'magenta'
-    if t == 'Fast RonS':
-        return 'yellow'
-    if t == 'Spikes':
-        return 'lightcyan'
-    if t == 'Sharp Spikes':
-        return 'black'
-    if t == 'Spikes + Sharp Spikes':
-        return 'magenta'
-    if t == 'Filtered RonO':
-        return 'mediumslateblue'
-    if t == 'Filtered RonS':
-        return 'lime'
-    if t == 'Filtered Fast RonO':
-        return 'darkviolet'
-    if t == 'Filtered Fast RonS':
-        return 'gold'
-    raise ValueError('graphics.table_color_for is undefined for type: {0}'.format(t))
-
-def color_by_gran(granularity):
-    if granularity == 0:
-        return 'lightblue'
-    elif granularity == 2:
-        return 'lightsalmon'
-    elif granularity == 3:
-        return 'lightgreen'
-    elif granularity == 5:
-        return 'lightyellow'
-    else:
-        raise RuntimeError('Undefined color for granularity {0}'.format(granularity))
-
-
+# Unique location info table
 def plot_score_in_loc_table(columns, rows, colors):
     col_colors = [table_color_for(t) if colors is None else color_list[i] for i, t in enumerate(sorted([r[0] for r in rows]))]
     font_colors = ['black' if c != 'blue' else 'white' for c in col_colors]
@@ -257,10 +194,8 @@ def plot_score_in_loc_table(columns, rows, colors):
         ))
     fig.show()
 
-
-
+# Multiple location info table
 def plot_score_table(t1):
-    import plotly.graph_objects as go
     np.random.seed(1)
     col_colors = []
     rows = []
@@ -294,6 +229,10 @@ def plot_score_table(t1):
         ])
     fig.update_layout(width=1300)
     fig.show()
+
+
+
+#RELATION TODO
 def plot_co_metric_auc_0(m_tab, a_tab):
     ms = []
     aucs = []
@@ -931,3 +870,77 @@ def boxplot_feature_distributions(feature_name, data):
     plt.savefig("/home/tpastore/Box_plot_Hippocampal_RonO_{0}.eps".format(feature_name), bbox_inches='tight')
     plt.savefig("/home/tpastore/Box_plot_Hippocampal_RonO_{0}.png".format(feature_name), bbox_inches='tight')
     plt.show()
+
+# Auxiliary functions
+
+def color_for(t):
+    if 'RonS baseline model_pat' == t:
+        return 'blue'
+    if 'FPR' in t:
+        colors = ['darkred', 'firebrick', 'red', 'indianred', 'lightcoral', 'aquamarine', 'springgreen', 'limegreen', 'green', 'darkgreen']
+        return colors[int(t[-1])]
+    if t == 'HFOs':
+        return 'b'
+    if t == 'RonO':
+        return 'b'
+    if t == 'RonS':
+        return 'g'
+    if t == 'Fast RonO':
+        return 'm'
+    if t == 'Fast RonS':
+        return 'y'
+    if t == 'Spikes':
+        return 'c'
+    if t == 'Sharp Spikes':
+        return 'k'
+    if t == 'Spikes + Sharp Spikes':
+        return 'magenta'
+    if t == 'Filtered RonO':
+        return 'mediumslateblue'
+    if t == 'Filtered RonS':
+        return 'lime'
+    if t == 'Filtered Fast RonO':
+        return 'darkviolet'
+    if t == 'Filtered Fast RonS':
+        return 'gold'
+
+    raise ValueError('graphics.color_for is undefined for type: {0}'.format(t))
+
+def table_color_for(t):
+    if t == 'HFOs':
+        return 'blue'
+    if t == 'RonO':
+        return 'blue'
+    if t == 'RonS':
+        return 'green'
+    if t == 'Fast RonO':
+        return 'magenta'
+    if t == 'Fast RonS':
+        return 'yellow'
+    if t == 'Spikes':
+        return 'lightcyan'
+    if t == 'Sharp Spikes':
+        return 'black'
+    if t == 'Spikes + Sharp Spikes':
+        return 'magenta'
+    if t == 'Filtered RonO':
+        return 'mediumslateblue'
+    if t == 'Filtered RonS':
+        return 'lime'
+    if t == 'Filtered Fast RonO':
+        return 'darkviolet'
+    if t == 'Filtered Fast RonS':
+        return 'gold'
+    raise ValueError('graphics.table_color_for is undefined for type: {0}'.format(t))
+
+def color_by_gran(granularity):
+    if granularity == 0:
+        return 'lightblue'
+    elif granularity == 2:
+        return 'lightsalmon'
+    elif granularity == 3:
+        return 'lightgreen'
+    elif granularity == 5:
+        return 'lightyellow'
+    else:
+        raise RuntimeError('Undefined color for granularity {0}'.format(granularity))

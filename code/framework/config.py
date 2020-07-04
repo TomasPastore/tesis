@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from models import naive_bayes, random_forest, svm_m, balanced_random_forest, xgboost, sgd, simulator
 
 DEBUG = True
@@ -69,11 +71,16 @@ hip_rons_validation_names = ['3997', 'IO001', '463', '4099', '466', 'IO025', '45
 
 color_list = [ 'blue', 'green', 'magenta', 'yellow', 'lightcyan', 'black', 'mediumslateblue', 'lime', 'darkviolet', 'gold']
 
+EXPERIMENTS_FOLDER = str(Path('~/Documentos/lic_computacion/tesis/experiments/').expanduser().resolve())
 
-#BUG REPORT
-# {'RonO_evt_SOZ_disagreement': 76539,
-# 'RonS_evt_SOZ_disagreement': 6513,
-# 'Spikes_evt_SOZ_disagreement': 1411,
-# 'Fast RonO_evt_SOZ_disagreement': 3971,
-# 'Fast RonS_evt_SOZ_disagreement': 1314,
-# 'Sharp Spikes_evt_SOZ_disagreement': 133}
+experiment_saving_path = {num:dict() for num in range(1,7)} #7 'Experiments'
+experiment_saving_path[1][0] = str(Path(EXPERIMENTS_FOLDER, '1_global_data/' ))
+experiment_saving_path[2][0] = str(Path(EXPERIMENTS_FOLDER, '2_rate_soz_vs_nsoz/' ))
+experiment_saving_path[3][0] = str(Path(EXPERIMENTS_FOLDER, '3_predicting_soz_with_rate/' ))
+experiment_saving_path[3][1] = str(Path(experiment_saving_path[3][0], 'hfos_vs_spikes/hfos_vs_spikes' ))
+experiment_saving_path[3][2] = str(Path(experiment_saving_path[3][0], 'hfo_types_vs_spikes/hfo_types_vs_spikes' ))
+experiment_saving_path[3][3] = str(Path(experiment_saving_path[3][0], 'hfo_types_localized/hfo_types_localized' ))
+experiment_saving_path[3][4] = str(Path(experiment_saving_path[3][0], 'pse_hfo_rate_auc_relation/pse_hfo_rate_auc_relation' ))
+
+
+

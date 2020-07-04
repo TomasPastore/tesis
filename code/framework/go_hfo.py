@@ -1,5 +1,6 @@
-
+import copy
 import random
+import sys
 from sys import version as py_version
 import time
 import warnings
@@ -10,8 +11,8 @@ from matplotlib import pyplot as plt #todo ver donde se usa, deberia estar solo 
 from sklearn.metrics import roc_auc_score, roc_curve
 from scipy.stats import wilcoxon, ranksums, kstest, ks_2samp
 import math as mt
-
-from config import (EVENT_TYPES, HFO_TYPES,
+from datetime import timedelta
+from config import (EVENT_TYPES, HFO_TYPES, experiment_saving_path, EXPERIMENTS_FOLDER,
                     intraop_patients, non_intraop_patients, electrodes_query_fields, hfo_query_fields, models_to_run)
 from db_parsing import Database, parse_patients, get_locations, encode_type_name, all_loc_names, load_patients, query_filters, all_subtype_names
 from metrics import print_metrics
@@ -32,6 +33,7 @@ def main():
 
     # phase_coupling_paper(hfo_collection) # Paper Frontiers
 
+    #TODO run experiment i j
 # 1) Data loading and tests that is well loaded
     # Set exit parameter to True if you just want the tests and comment if you don't want to test before computing
     # tests.unittest.main(exit=False)
@@ -48,31 +50,62 @@ def main():
 
 # TODO: Ver si es necesario despues de hacer el ml
 # 3) HFO rate in SOZ vs NSOZ
+    # i) Whole brain
+    # ii) Localized
 
-# TODO: Tipos separados cargando y sin cargar x y z
 # TODO move to soz_predictor module
 # 4) Predicting SOZ with rates: Baselines
+    # Se quiere mejorar el rendimiento del rate de los distintos tipos de HFO, para eso veamos los baselines
+
+    # 0) First steps: TODO add to overleaf
     # Whole brain HFOs all together allowing x y z with null values because we will not do ml with all HFO types together
-    evt_rate_soz_predictor_hfos_vs_spikes_whole_brain(elec_collection, evt_collection) # TODO pasar a informe fotos en carpeta, usar info_evt para discusion
+    #evt_rate_soz_predictor_hfos_vs_spikes_whole_brain(elec_collection, evt_collection) # TODO pasar a informe fotos en carpeta, usar info_evt para discusion
 
-    # Whole brain HFO types vs spikes: both versions with or without x y z
-    #evt_rate_soz_predictor_hfo_types_vs_spikes_whole_brain(allow_null_coords=True)
-    #evt_rate_soz_predictor_hfo_types_vs_spikes_whole_brain(allow_null_coords=False)
-    # Both versions, x y z = -1 allowed and or not (for ml with or without x,y,z) no deberia haber mucha dif, si no la hay agarro el de todo     para el baseline, sino ver si los que tienen loc definida tienen definida la coord
+    # Whole brain HFO types vs spikes:
+    # Allow everything but fix inconsistencies N_pat= 91
+    # Aca se ve que ciertos tipos de HFO son mejores que spike por si sólos. Se va a intentar mejorarlos con ml
+    # evt_rate_soz_predictor_hfo_types_vs_spikes_whole_brain(elec_collection, evt_collection, allow_null_coords=True,
+    #                                                       allow_empty_loc=True, rm_xyz_null=False, rm_loc_empty=False)
 
-# Note: Since here we only compare HFO types (not Spikes any more)
+    # i) Whole brain TODO add to overleaf
+    # Podríamos hacer dos modelos, a)ML con 91 pacientes sin usar x,y,z  b)ML con 57 pacientes usando x,y,z.
 
-    # TODO ver si varia la cantidad de elec si cargas loc5= 'l' a cargar todo y despues filtrar desde python
-    # HFO_types_in_locations(elec_collection, evt_collection) #TODO ver si hay loc no empty con x y z = -1, si no hay es una buena. sino elijo baseline a los q si lo tienen
-    # pse_hfo_rate_auc_relation(elec_collection, evt_collection) #TODO implementarla
+    # Ma) Se usaria el baseline del warmup xyz pueden ser null
 
-# 5) ML HFO classifiers
+    # Mb) Disallow null coords from db
+    #evt_rate_soz_predictor_hfo_types_vs_spikes_whole_brain(elec_collection, evt_collection, allow_null_coords=False,
+    #                                                      allow_empty_loc=True, rm_xyz_null=False, rm_loc_empty=False)
+
+    # Results note: This improves AUC 2% but we loose 34 patients,  N_pat=57 There are still 2 electrodes in None because of bad format of the field (empty lists map to None) from db, use disallow from python
+
+    # Disallow null coords from python
+    #evt_rate_soz_predictor_hfo_types_vs_spikes_whole_brain(elec_collection, evt_collection, allow_null_coords=True,
+    #                                                       allow_empty_loc=True, rm_xyz_null=True, rm_loc_empty=False)
+
+    # Results note:
+
+    # ii) Localized hfo rate #TODO agregar spikes y revisar all zones
+    # Localized solo hay un baseline que es el que tiene taggeado los x,y,z porque tienen que tener la loc definida
+    # Metodologia, se carga toda la base, se resuelve inconsitencias y luego se clasifica por loc del electrodo.
+
+    #TODO now
+    #hfo_types_in_locations(elec_collection, evt_collection, allow_null_coords=True,
+     #                      allow_empty_loc=True, rm_xyz_null=True, rm_loc_empty=True)
+
+    # TODO 4/7
+    # iii) Proportion of soz electrodes AUC relation
+    # pse_hfo_rate_auc_relation(elec_collection, evt_collection)
+
+#TODO week 6/7
+# 5) ML HFO classifiers para extremos de 3 iii
     # Resultados: xgboost, model_patients (%75), random partition, robust scaler, balanced, filter 0.7 da 0.8 de AP
     # Statistical_tests(elec_collection, evt_collection) # TODO sacar de aca
     # whole_brain_hfo_classifier(elec_collection, evt_collection) # TODO with allowed and not allowed coords
     # hippocampus_hfo_classifier(elec_collection, evt_collection) # #TODO with allowed or not allowed coords if loc makes this possible
     # phfo_analysis_zoom(elec_collection, evt_collection,'Hippocampus', 'RonS') #TODO meter adentro del analisis del hipocampo para el ml
-
+    # Frons in hippocampuss
+    
+#TODO week 12/7
 # 6) pHFOs rate VS HFO rate baseline
     # phfo_rate_vs_baseline_whole_brain(elec_collection, evt_collection, allow_null_coords=True, event_type_names) #TODO
     # phfo_rate_vs_baseline_whole_brain(elec_collection, evt_collection, allow_null_coords=True) #TODO
@@ -81,8 +114,12 @@ def main():
     # Hippocampal_RonS_gradual_filters(elec_collection, evt_collection)
     # Hippocampal_RonS_ml_with_rate(elec_collection, evt_collection) # TODO mencionar en discusion de resultados de la comparacion de baseline vs ml filters
 
+#TODO week 19/7
 # 7) Simulation of the ml predictor to understand needed performance to improve HFO rate baseline
     # simulator(elec_collection, evt_collection) TODO mencionar en discusion de resultados de la comparacion de baseline vs ml filters
+
+#TODO week 26/7 dump to overleaf reeplazing commented structure to code structure with if
+# Trabajo futuro combinacion de subtipos, mas datos,
 
 
 ############################       Development Steps     #######################################
@@ -99,7 +136,8 @@ def print_non_intraop_patients():
 # We developed this function that gathers global info about the region, it will be used for localized analysis later
 def global_info_in_locations(elec_collection, evt_collection, intraop=False, loc_granularity = 0, locations ='all', event_type_names = EVENT_TYPES):
     print('Gathering global info...')
-    patients_by_loc = load_patients(elec_collection, evt_collection, intraop, loc_granularity, locations, event_type_names, models_to_run)
+    patients_by_loc = load_patients(elec_collection, evt_collection, intraop, loc_granularity, locations, event_type_names, models_to_run,
+                                    allow_null_coords=True, allow_empty_loc=True)
     for loc_name in patients_by_loc.keys():
         patients_dic = patients_by_loc[loc_name]
         info = region_info(patients_dic, event_types=event_type_names, flush=False, conf=None)
@@ -108,7 +146,8 @@ def global_info_in_locations(elec_collection, evt_collection, intraop=False, loc
 # TODO view how many patients with focal epilepsy per locations do we have and evaluate null elements
 def show_patients_by_epilepsy_loc(elec_collection, evt_collection, intraop=False,  loc_granularity = 0, locations = 'all',
                                   event_type_names = EVENT_TYPES, soz_restricted=[''], soz_required=None):
-    patients_by_loc = load_patients(elec_collection, evt_collection, intraop, loc_granularity, locations, event_type_names, models_to_run)
+    patients_by_loc = load_patients(elec_collection, evt_collection, intraop, loc_granularity, locations, event_type_names,
+                                    models_to_run, allow_null_coords=True, allow_empty_loc=True)
     loc_name = [loc for loc in patients_by_loc.keys()][0]
     patients_dic = patients_by_loc[loc_name]
 
@@ -224,7 +263,7 @@ def evt_rate_soz_predictor_hfos_vs_spikes_whole_brain(elec_collection, evt_colle
     print('Running all brain HFOs rate vs Spike rate')
     start_time = time.time()
     patients_by_loc = load_patients(elec_collection, evt_collection, intraop, loc_granularity=0, locations=['Whole Brain'],
-                                    event_type_names = EVENT_TYPES, models_to_run=models_to_run)
+                                    event_type_names = EVENT_TYPES, models_to_run=models_to_run, allow_null_coords=True, allow_empty_loc=True)
     loc_name = [loc for loc in patients_by_loc.keys()][0]
     patients_dic = patients_by_loc[loc_name]
     event_type_data_by_loc = dict()
@@ -235,59 +274,75 @@ def evt_rate_soz_predictor_hfos_vs_spikes_whole_brain(elec_collection, evt_colle
     info_spikes = region_info(patients_dic, ['Spikes'])
     print_info(info_spikes)
     event_type_data_by_loc[loc_name]['Spikes'] = info_spikes
-    print('{0} seconds for rate Spikes data'.format(time.time() - start_time))
+    print('{0} seconds for rate Spikes data'.format(str(timedelta(seconds=time.time() - start_time))))
 
     #NO DIFERENCE WITH SPIKES in AUC, REMOVED TO SIMPLIFY
     print('\nCalculating HFOs rate data')
     start_time = time.time()
     info_hfos = region_info(patients_dic, HFO_TYPES)
-    #print_info(info_hfos)
+    print_info(info_hfos)
     event_type_data_by_loc[loc_name]['HFOs'] = info_hfos
     print('{0} seconds for rate hfo data'.format(time.time() - start_time))
 
     #print(LOG)
-    #print('Plotting...')
-    #graphics.event_rate_by_loc(event_type_data_by_loc, metrics=['pse', 'pnee', 'auc'])
-    #plt.show()
-# TODO CARGAR TODOS Y DESPUES BORRAR LOS DE LOC EMPTY o filtro los de loc == tanto
+    print('Plotting...')
+    saving_path = experiment_saving_path[3][1]
+    graphics.event_rate_by_loc(event_type_data_by_loc, metrics=['pse', 'pnee', 'auc'], saving_path = saving_path)
+    plt.show()
+
 # Whole brain HFO types vs spikes: both versions with or without x y z
-def evt_rate_soz_predictor_hfo_types_vs_spikes_whole_brain(elec_collection, evt_collection, intraop=False, allow_null_coords=True):
+def evt_rate_soz_predictor_hfo_types_vs_spikes_whole_brain(elec_collection, evt_collection, intraop=False,
+                                                           allow_null_coords=True, allow_empty_loc=True,
+                                                           rm_xyz_null=False, rm_loc_empty=False):
     print('SOZ prediction by rate')
-    print('All brain HFOs types rate vs Spike rate. Allow Null coordinates: {0}'.format(str(allow_null_coords)))
+    print('All brain HFOs types rate vs Spike rate.')
+    print('Allow Null coordinates from db: {0}'.format(str(allow_null_coords)))
+    print('Allow empty loc from db: {0}'.format(str(allow_empty_loc)))
+    print('Remove null coords in python: {0}'.format(str(rm_xyz_null)))
+    print('Remove empty loc in python: {0}'.format(str(rm_loc_empty)))
+
+    types_to_compare = HFO_TYPES + ['Spikes']
     patients_by_loc = load_patients(elec_collection, evt_collection, intraop, loc_granularity=0, locations=['Whole Brain'],
-                                    event_type_names=EVENT_TYPES, models_to_run=models_to_run, allow_null_coords=allow_null_coords)
+                                    event_type_names=types_to_compare, models_to_run=models_to_run,
+                                    allow_null_coords=allow_null_coords, allow_empty_loc=allow_empty_loc,
+                                    rm_xyz_null=rm_xyz_null, rm_loc_empty=rm_loc_empty)
     loc_name = [loc for loc in patients_by_loc.keys()][0]
     patients_dic = patients_by_loc[loc_name]
     event_type_data_by_loc = dict()
     event_type_data_by_loc[loc_name] = dict()
 
-    for event_type_name in EVENT_TYPES:
-        'Info of type {0}'.format(event_type_name)
-        info_evt = region_info(patients_dic, [event_type_name])
-        print_info(info_evt)
-        event_type_data_by_loc[loc_name][event_type_name] = info_evt
+    saving_path = experiment_saving_path[3][2]
+    info_saving_path = saving_path+'_info.txt'
+    with open(info_saving_path, "w") as file:
+        file.write('Info data for Event types... \n')
+    with open(info_saving_path, "a") as file:
+        for event_type_name in types_to_compare:
+            print('\nInfo of type: {t}'.format(t=event_type_name), file=file)
+            event_type_data_by_loc[loc_name][event_type_name] = region_info(patients_dic, [event_type_name])
+            print_info(event_type_data_by_loc[loc_name][event_type_name], file=file)
 
     print('Plotting...')
-    graphics.event_rate_by_loc(event_type_data_by_loc, metrics=['pse', 'pnee', 'auc'])
+    graphics.event_rate_by_loc(event_type_data_by_loc, metrics=['pse', 'pnee', 'auc'], saving_path=saving_path)
     plt.show()
 
-def HFO_types_in_locations():
-    print('Phfo analysis')
+def hfo_types_in_locations(elec_collection, evt_collection, allow_null_coords=True,
+                           allow_empty_loc=True, rm_xyz_null=True, rm_loc_empty=False):
     locations = ['Whole brain'] + all_loc_names(2) + all_loc_names(3) + all_loc_names(5)
-    tables = {'proportion': {loc: {t: 0 for t in HFO_TYPES} for loc in locations},
-              'pse': {loc: {t: 0 for t in HFO_TYPES} for loc in locations},
-              'pscore': {loc: {t: 0 for t in HFO_TYPES} for loc in locations},
-              'AUC_ROC': {loc: {t: 0 for t in HFO_TYPES} for loc in locations}}
-    compare_event_type_rates_by_loc(HFO_TYPES, loc_granularity=0, intraop=False, tables=tables)
-    compare_event_type_rates_by_loc(HFO_TYPES, loc_granularity=2, intraop=False, tables=tables)
-    compare_event_type_rates_by_loc(HFO_TYPES, loc_granularity=3, intraop=False, tables=tables)
-    compare_event_type_rates_by_loc(HFO_TYPES, loc_granularity=5, intraop=False, tables=tables)
-    graphics.plot_score_table(tables['proportion'])
-    graphics.plot_score_table(tables['pse'])
-    graphics.plot_score_table(tables['AUC_ROC'])
+    # Saves pse and AUC ROC of each HFO type of baseline rate
+    columns = {c: 0 for c in ['PSE', HFO_TYPES]}
+    baseline_info_by_loc = {loc: copy.deepcopy(columns) for loc in locations}
+    compare_event_type_rates_by_loc(elec_collection, evt_collection, loc_granularity=0, event_type_names=HFO_TYPES,
+                                    bs_info_by_loc=baseline_info_by_loc, saving_path=EXPERIMENTS_FOLDER)
+    compare_event_type_rates_by_loc(elec_collection, evt_collection, loc_granularity=2, event_type_names=HFO_TYPES,
+                                    bs_info_by_loc=baseline_info_by_loc, saving_path=EXPERIMENTS_FOLDER)
+    compare_event_type_rates_by_loc(elec_collection, evt_collection, loc_granularity=3, event_type_names=HFO_TYPES,
+                                    bs_info_by_loc=baseline_info_by_loc, saving_path=EXPERIMENTS_FOLDER)
+    compare_event_type_rates_by_loc(elec_collection, evt_collection, loc_granularity=5, event_type_names=HFO_TYPES,
+                                    bs_info_by_loc=baseline_info_by_loc, saving_path=EXPERIMENTS_FOLDER)
 
+    #graphics.plot_score_table(bs_info_by_loc)
     #graphics.plot_co_metrics_auc(tables['proportion'], tables['pse'], tables['AUC_ROC'])
-    graphics.plot_co_metric_auc_0(tables['pscore'], tables['AUC_ROC'])
+    #graphics.plot_co_metric_auc_0(tables['pscore'], tables['AUC_ROC'])
 
 
 # 5) ML HFO classifiers
@@ -563,16 +618,15 @@ def region_info(patients_dic, event_types=EVENT_TYPES, flush=False, conf=None):
     return info
 
 # The two main functions that compare baseline with ml
-def compare_event_type_rates_by_loc(elec_collection, evt_collection, event_type_names=EVENT_TYPES, loc_granularity=0, locations='all',
-                                    intraop=False, filter_phfos=False, filter_info=None, tables=None):
+def compare_event_type_rates_by_loc(elec_collection, evt_collection, intraop=False, loc_granularity=0, locations='all',
+                                    event_type_names=EVENT_TYPES, filter_phfos=False, filter_info=None,
+                                    bs_info_by_loc=None, saving_path=EXPERIMENTS_FOLDER):
     print('Comparing event type rates by location...')
     if filter_phfos:
-        assert( isinstance(filter_info, dict) )
-        assert('target' in filter_info.keys())
-        assert('tol_fpr' in filter_info.keys())
-        assert('perfect' in filter_info.keys()) #remove TODO no tiene sentido el perfect
+        assert( all([isinstance(filter_info, dict), 'target' in filter_info.keys(), 'tol_fpr' in filter_info.keys()]) )
 
-    patients_by_loc = load_patients(elec_collection, evt_collection, intraop, loc_granularity, locations, event_type_names, models_to_run)
+    patients_by_loc = load_patients(elec_collection, evt_collection, intraop,
+                                    loc_granularity, locations, event_type_names, models_to_run)
 
     event_type_data_by_loc = dict()
     print('Populating rate data by location and type...')
@@ -580,26 +634,19 @@ def compare_event_type_rates_by_loc(elec_collection, evt_collection, event_type_
         event_type_data_by_loc[loc_name] = dict()
         for evt_type_name in event_type_names:
             event_type_data_by_loc[loc_name][evt_type_name] = region_info(patients_dic, [evt_type_name])
-
-            if tables is not None:
-                tables['proportion'][loc_name][evt_type_name] = event_type_data_by_loc[loc_name][evt_type_name][
-                    'proportion_score']
-                tables['pse'][loc_name][evt_type_name] = event_type_data_by_loc[loc_name][evt_type_name][
-                    'pse']/100
-                tables['pscore'][loc_name][evt_type_name] = event_type_data_by_loc[loc_name][evt_type_name][
-                    'pscore']
-                tables['AUC_ROC'][loc_name][evt_type_name] = event_type_data_by_loc[loc_name][evt_type_name][
-                    'AUC_ROC']
+            if bs_info_by_loc is not None:
+                bs_info_by_loc[loc_name][evt_type_name] = event_type_data_by_loc[loc_name][evt_type_name]['AUC_ROC']
+                bs_info_by_loc[loc_name]['PSE'] = event_type_data_by_loc[loc_name][evt_type_name]['pse'] #Should agree among types, checked in db_parsing
 
             if filter_phfos and evt_type_name not in ['Spikes', 'Sharp Spikes']:
                 patients_dic = phfo_filter(evt_type_name, patients_dic, target=filter_info['target'],
                                            tolerated_fpr=filter_info['tol_fpr'], perfect=filter_info['perfect'])
                 event_type_data_by_loc[loc_name]['Filtered ' + evt_type_name] = region_info(patients_dic, [evt_type_name], flush=True)
 
-    graphics.event_rate_by_loc(event_type_data_by_loc)
+    graphics.event_rate_by_loc(event_type_data_by_loc, saving_path)
 
 def compare_subtypes_rate_by_loc(elec_collection, evt_collection, hfo_type_name, subtypes='all', loc_granularity=0, locations='all',
-                                 intraop=False, filter_phfos=False, filter_info=None):
+                                 intraop=False, filter_phfos=False, filter_info=None, saving_path=EXPERIMENTS_FOLDER):
     # In this case we need to load subtype and calculate the rate to avoid mixing the subtypes in the rate.
     # The structure doesn't differ among subtypes
     subtypes = all_subtype_names(hfo_type_name) if subtypes == 'all' else subtypes
@@ -619,7 +666,7 @@ def compare_subtypes_rate_by_loc(elec_collection, evt_collection, hfo_type_name,
                                            tolerated_fpr=filter_info['tol_fpr'], perfect=filter_info['perfect'])
                 subtype_data_by_loc[loc_name]['Filtered_' + hfo_type_name] = region_info(patients_dic, [hfo_type_name])
 
-    graphics.event_rate_by_loc(subtype_data_by_loc, zoomed_type=hfo_type_name)
+    graphics.event_rate_by_loc(subtype_data_by_loc, zoomed_type=hfo_type_name, saving_path=saving_path)
     plt.show()
 
 
