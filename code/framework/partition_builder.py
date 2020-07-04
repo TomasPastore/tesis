@@ -12,7 +12,7 @@ from sklearn.preprocessing import RobustScaler, StandardScaler
 
 # Filtra pacientes que cumplen un threshold de cantidad de eventos
 from config import hip_rons_validation_names
-
+#Todo shouldn't this be inside ml module? 
 
 def patients_with_more_than(count, hfo_type_name, patients_dic):
     with_hfos = dict()

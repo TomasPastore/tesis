@@ -61,7 +61,7 @@ def main():
     # Whole brain HFOs all together allowing x y z with null values because we will not do ml with all HFO types together
     #evt_rate_soz_predictor_hfos_vs_spikes_whole_brain(elec_collection, evt_collection) # TODO pasar a informe fotos en carpeta, usar info_evt para discusion
 
-    # Whole brain HFO types vs spikes:
+    # Whole brain rates for independent event types:
     # Allow everything but fix inconsistencies N_pat= 91
     # Aca se ve que ciertos tipos de HFO son mejores que spike por si sólos. Se va a intentar mejorarlos con ml
     # evt_rate_soz_predictor_hfo_types_vs_spikes_whole_brain(elec_collection, evt_collection, allow_null_coords=True,
@@ -89,22 +89,26 @@ def main():
     # Metodologia, se carga toda la base, se resuelve inconsitencias y luego se clasifica por loc del electrodo.
 
     #TODO now
-    #hfo_types_in_locations(elec_collection, evt_collection, allow_null_coords=True,
-     #                      allow_empty_loc=True, rm_xyz_null=True, rm_loc_empty=True)
+    # Para el localizado cargamos toda la data y despues lo clasificamos por zona asi resolvemos inconsistencias y no perdemos datos.
+    # ademas para ubicaciones particulares tenemos definida x, y, z por lo que es el mismo baseline para ambos modelos de ml
+    hfo_types_in_locations(elec_collection, evt_collection, allow_null_coords_db=True,
+                           allow_empty_loc_db=True, rm_xyz_null=True, rm_loc_empty=True)
 
     # TODO 4/7
     # iii) Proportion of soz electrodes AUC relation
     # pse_hfo_rate_auc_relation(elec_collection, evt_collection)
 
+
 #TODO week 6/7
 # 5) ML HFO classifiers para extremos de 3 iii
+    # Usar sklearn pipeline
     # Resultados: xgboost, model_patients (%75), random partition, robust scaler, balanced, filter 0.7 da 0.8 de AP
     # Statistical_tests(elec_collection, evt_collection) # TODO sacar de aca
     # whole_brain_hfo_classifier(elec_collection, evt_collection) # TODO with allowed and not allowed coords
     # hippocampus_hfo_classifier(elec_collection, evt_collection) # #TODO with allowed or not allowed coords if loc makes this possible
     # phfo_analysis_zoom(elec_collection, evt_collection,'Hippocampus', 'RonS') #TODO meter adentro del analisis del hipocampo para el ml
     # Frons in hippocampuss
-    
+
 #TODO week 12/7
 # 6) pHFOs rate VS HFO rate baseline
     # phfo_rate_vs_baseline_whole_brain(elec_collection, evt_collection, allow_null_coords=True, event_type_names) #TODO
@@ -325,8 +329,9 @@ def evt_rate_soz_predictor_hfo_types_vs_spikes_whole_brain(elec_collection, evt_
     graphics.event_rate_by_loc(event_type_data_by_loc, metrics=['pse', 'pnee', 'auc'], saving_path=saving_path)
     plt.show()
 
-def hfo_types_in_locations(elec_collection, evt_collection, allow_null_coords=True,
-                           allow_empty_loc=True, rm_xyz_null=True, rm_loc_empty=False):
+#TODO merge and add spikes
+def hfo_types_in_locations(elec_collection, evt_collection, allow_null_coords_db=True,
+                           allow_empty_loc_db=True, rm_xyz_null=True, rm_loc_empty=False):
     locations = ['Whole brain'] + all_loc_names(2) + all_loc_names(3) + all_loc_names(5)
     # Saves pse and AUC ROC of each HFO type of baseline rate
     columns = {c: 0 for c in ['PSE', HFO_TYPES]}
@@ -340,7 +345,13 @@ def hfo_types_in_locations(elec_collection, evt_collection, allow_null_coords=Tr
     compare_event_type_rates_by_loc(elec_collection, evt_collection, loc_granularity=5, event_type_names=HFO_TYPES,
                                     bs_info_by_loc=baseline_info_by_loc, saving_path=EXPERIMENTS_FOLDER)
 
-    #graphics.plot_score_table(bs_info_by_loc)
+    # TODO merge
+    # evt_rate_soz_predictor_hfo_types_vs_spikes_whole_brain(elec_collection, evt_collection, allow_null_coords=True,
+    #                                                       allow_empty_loc=True, rm_xyz_null=True, rm_loc_empty=False)
+
+def pse_hfo_rate_auc_relation(elec_collection, evt_collection):
+    pass
+   #graphics.plot_score_table(bs_info_by_loc)
     #graphics.plot_co_metrics_auc(tables['proportion'], tables['pse'], tables['AUC_ROC'])
     #graphics.plot_co_metric_auc_0(tables['pscore'], tables['AUC_ROC'])
 
