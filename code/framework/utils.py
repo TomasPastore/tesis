@@ -1,6 +1,7 @@
 
 import copy
 import math as mt
+from datetime import time, timedelta
 from itertools import chain, combinations
 from sys import version as py_version
 
@@ -80,6 +81,21 @@ def print_info(info_evts, file):
     print('Count of patients with empty loc: {0}'.format(len(pat_with_empty_loc)), file=file)
     print('List of patients with empty loc: {0}'.format(pat_with_empty_loc), file=file)
 
+def time_counter(callable_code):
+    start_time = time.time()
+    callable_code()
+    print('Runned in {0} seconds'.format(str(timedelta(seconds=time.time() - start_time))))
+
+def constant(f):
+    def fset(self, value):
+        raise TypeError('You cant modify this constant')
+    def fget(self):
+        return f()
+    return property(fget, fset)
+
+@constant
+def FOO():
+    return 'constant'
 
 def all_subsets(ss):
     return chain(*map(lambda x: combinations(ss, x), range(1, len(ss) + 1)))

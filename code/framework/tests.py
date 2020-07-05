@@ -8,7 +8,7 @@ import graphics
 from config import (EVENT_TYPES, HFO_TYPES,
                     intraop_patients, non_intraop_patients, electrodes_query_fields, hfo_query_fields, models_to_run)
 from db_parsing import Database, parse_patients, get_locations, encode_type_name
-from go_hfo import query_filters
+from main import query_filters, run_experiment
 
 
 class hfoDBTest(unittest.TestCase):
@@ -69,6 +69,15 @@ class hfoDBTest(unittest.TestCase):
         for type in event_type_names:
             self.assertEqual(0, bugs_by_type['{type}_evt_SOZ_disagreement'.format(type=type)])
 
-
+    def test_experiments_are_implemented(self):
+        #TODO complete experiments
+        for number, roman_number, letter in [('1', None, None),
+                                             ('2','i', None),
+                                             ('2', 'ii', None)
+                                        ]:
+            try:
+                run_experiment(number, roman_number, letter)
+            except NotImplementedError as e:
+                raise e
 if __name__ == "__main__":
     unittest.main()

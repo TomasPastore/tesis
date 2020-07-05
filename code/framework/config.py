@@ -72,15 +72,37 @@ hip_rons_validation_names = ['3997', 'IO001', '463', '4099', '466', 'IO025', '45
 color_list = [ 'blue', 'green', 'magenta', 'yellow', 'lightcyan', 'black', 'mediumslateblue', 'lime', 'darkviolet', 'gold']
 
 EXPERIMENTS_FOLDER = str(Path('~/Documentos/lic_computacion/tesis/experiments/').expanduser().resolve())
+experiment_default_path = str(Path(EXPERIMENTS_FOLDER, 'exp') )
 
-experiment_saving_path = {num:dict() for num in range(1,7)} #7 'Experiments'
-experiment_saving_path[1][0] = str(Path(EXPERIMENTS_FOLDER, '1_global_data/' ))
-experiment_saving_path[2][0] = str(Path(EXPERIMENTS_FOLDER, '2_rate_soz_vs_nsoz/' ))
-experiment_saving_path[3][0] = str(Path(EXPERIMENTS_FOLDER, '3_predicting_soz_with_rate/' ))
-experiment_saving_path[3][1] = str(Path(experiment_saving_path[3][0], 'hfos_vs_spikes/hfos_vs_spikes' ))
-experiment_saving_path[3][2] = str(Path(experiment_saving_path[3][0], 'hfo_types_vs_spikes/hfo_types_vs_spikes' ))
-experiment_saving_path[3][3] = str(Path(experiment_saving_path[3][0], 'hfo_types_localized/hfo_types_localized' ))
-experiment_saving_path[3][4] = str(Path(experiment_saving_path[3][0], 'pse_hfo_rate_auc_relation/pse_hfo_rate_auc_relation' ))
+
+exp_save_path = dict() #7 'Experiments'
+
+exp_save_path[1] = str(Path(EXPERIMENTS_FOLDER, '1_global_data/global_data'))
+
+exp_save_path[2] = dict()
+exp_save_path[2]['dir'] = str(Path(EXPERIMENTS_FOLDER, '2_rate_soz_vs_nsoz/'))
+exp_save_path[2]['i'] = str(Path(exp_save_path[2]['dir'],'i_whole_brain/whole_brain'))
+exp_save_path[2]['ii'] = str(Path(exp_save_path[2]['dir'],
+                                  'ii_whole_brain/localized'))
+
+exp_save_path[3] = dict()
+exp_save_path[3]['dir'] = str(Path(EXPERIMENTS_FOLDER, '3_predicting_soz_with_rate/'))
+exp_save_path[3]['0'] = str(Path(exp_save_path[3]['dir'],
+                                 '/3_0_first_steps/hfos_and_spikes'))
+exp_save_path[3]['i'] = dict()
+exp_save_path[3]['i']['dir'] = str(Path(exp_save_path[3]['dir'],
+                               '3_i_whole_brain/'))
+exp_save_path[3]['i']['a'] = str(Path(exp_save_path[3]['i']['dir'],
+                                      '3_i_a_all_sleep_data/3_i_a_all_sleep_data'))
+exp_save_path[3]['i']['b'] = str(Path(exp_save_path[3]['i']['dir'],
+                                      '3_i_b_sleep_with_tagged_coords/3_i_b_sleep_with_tagged_coords'))
+
+exp_save_path[3]['ii'] = dict()
+exp_save_path[3]['ii']['dir'] = str(Path(exp_save_path[3]['dir'],
+                                 '3_ii_localized/'))
+
+exp_save_path[3]['iii'] = str(Path(exp_save_path[3]['dir'],
+                               '3_iii_pse_hfo_rate_auc_relation/pse_hfo_rate_auc_relation'))
 
 
 
