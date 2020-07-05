@@ -306,10 +306,18 @@ def parse_events(patients, event_collection, event_type_names, models_to_run, re
             loc5=loc5,
             age=patient.age
         )
+
+        #TODO change frec_angle in 0 to None,
+        # shouldnt do ml with empty entries
         if decode_type_name(evt['type']) in ['RonO', 'Fast RonO']:
+            # Compass sample --> 37% has slow == [], we should map to None
+            # not to 0
             info['slow'] = bool(evt['slow'])
             info['slow_vs'] = 0.0 if (isinstance(evt['slow_vs'], list) or evt['slow_vs'] is None) else float(
                 evt['slow_vs'])
+
+            if evt['slow_angle'] is None:
+                raise RuntimeError('Not in compass sample report')
             info['slow_angle'] = 0.0 if (isinstance(evt['slow_angle'], list) or evt['slow_angle'] is None) else float(
                 evt['slow_angle'])
             info['delta'] = bool(evt['delta'])
