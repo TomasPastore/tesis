@@ -15,7 +15,7 @@ from sklearn.metrics import roc_auc_score, roc_curve
 from scipy.stats import wilcoxon, ranksums, kstest, ks_2samp
 import math as mt
 from datetime import timedelta
-from config import (EVENT_TYPES, HFO_TYPES, exp_save_path,
+from config import (EVENT_TYPES, HFO_TYPES, exp_save_path, TEST_BEFORE_RUN,
                     EXPERIMENTS_FOLDER, experiment_default_path,
                     intraop_patients, non_intraop_patients,
                     electrodes_query_fields, hfo_query_fields, models_to_run)
@@ -31,6 +31,7 @@ if running_py_3_5:
     from utils import histograms, phase_coupling_paper_polar
 from utils import all_subsets, LOG, print_info
 import tests
+import unittest
 import graphics
 
 
@@ -41,8 +42,12 @@ def main():
     elec_collection, evt_collection = db.get_collections()
     # phase_coupling_paper(hfo_collection) # Paper Frontiers
 
-    #Thesis experiments
-    run_experiment(elec_collection, evt_collection, number=3, roman_num='i',
+    # Thesis
+    if TEST_BEFORE_RUN:
+        # TODO Agregar a informe, tests
+        unittest.main(tests, exit=False)
+
+    run_experiment(elec_collection, evt_collection, number=3, roman_num='0',
                    letter='a')
 
     # TODO week 26/7 dump to overleaf reeplazing commented structure to code structure with if
@@ -50,14 +55,9 @@ def main():
 
 def run_experiment(elec_collection, evt_collection, number, roman_num,
                    letter):
-    NOT_IMPLEMENTED_EXP = NotImplementedError('Unknown experiment class')
-    if number == 0:
-        print('Runing data loading and tests')
-        # Set exit parameter to True if you just want the tests and comment
-        # if you don't want to test before computing
-        # TODO Agregar a informe, tests
-        tests.unittest.main(exit=False)
-    elif number == 1:
+    NOT_IMPLEMENTED_EXP = NotImplementedError('Not implemented experiment')
+    REVIEW_AND_INFORM = RuntimeError('Last review to inform')
+    if number == 1:
         print('Running exp 1) Data Global analysis')
         # Total patient count, intraop vs Non intraop, other info
         # IO have artifacts, discarded ? TODO ask shennan
@@ -67,7 +67,7 @@ def run_experiment(elec_collection, evt_collection, number, roman_num,
         #                     locations = 'all', event_type_names = EVENT_TYPES)
         # show_patients_by_epilepsy_loc(soz_restricted = ['Temporal Lobe'],
         # soz_required=['Temporal Lobe'])
-        raise NOT_IMPLEMENTED_EXP
+        raise REVIEW_AND_INFORM
     elif number == 2:
         if roman_num == 'i':
             print('Running exp 2.i) HFO rate in SOZ vs NSOZ in Whole brain')
@@ -392,7 +392,7 @@ def evt_rate_soz_pred_baseline_whole_brain(elec_collection, evt_collection,
     # Create info header
     info_saving_path = saving_path + '_info.txt'
     #Create parents dirs if they dont exist
-    Path(info_saving_path).parent.mkdir(parents=True, exist_ok=True)
+    Path(info_saving_path).parent.mkdir(0o755, parents=True, exist_ok=True)
     with open(info_saving_path, "w+") as file:
         file.write('Info data for Event types to compare... \n')
         for event_type_names in evt_types_to_cmp:

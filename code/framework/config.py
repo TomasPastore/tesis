@@ -4,7 +4,7 @@ from models import naive_bayes, random_forest, svm_m, balanced_random_forest, xg
 
 DEBUG = True
 LOG = {}
-
+TEST_BEFORE_RUN = False
 #PROBAR CON EL FILTRO EN ELECTRODOS DE FILTRAR LOS X Y Z VALIDOS
 
 #Global var for biomarkers to be loaded and analized

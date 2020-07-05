@@ -13,6 +13,7 @@ from main import query_filters, run_experiment
 
 class hfoDBTest(unittest.TestCase):
     def setUp(self):
+        print('Setting up test suite')
         db = Database()
         connection = db.get_connection()
         db = connection.deckard_new
@@ -71,12 +72,14 @@ class hfoDBTest(unittest.TestCase):
 
     def test_experiments_are_implemented(self):
         #TODO complete experiments
-        for number, roman_number, letter in [('1', None, None),
+        for number, roman_num, letter in [('1', None, None),
                                              ('2','i', None),
                                              ('2', 'ii', None)
                                         ]:
             try:
-                run_experiment(number, roman_number, letter)
+                run_experiment(self.electrodes_collection, self.hfo_collection,
+                               number,
+                               roman_num, letter)
             except NotImplementedError as e:
                 raise e
 if __name__ == "__main__":

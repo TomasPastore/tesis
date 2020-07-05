@@ -307,44 +307,14 @@ def parse_events(patients, event_collection, event_type_names, models_to_run, re
             age=patient.age
         )
 
-        #TODO change frec_angle in 0 to None,
-        # shouldnt do ml with empty entries
         if decode_type_name(evt['type']) in ['RonO', 'Fast RonO']:
-            # Compass sample --> 37% has slow == [], we should map to None
-            # not to 0
-            info['slow'] = bool(evt['slow'])
-            info['slow_vs'] = 0.0 if (isinstance(evt['slow_vs'], list) or evt['slow_vs'] is None) else float(
-                evt['slow_vs'])
-
-            if evt['slow_angle'] is None:
-                raise RuntimeError('Not in compass sample report')
-            info['slow_angle'] = 0.0 if (isinstance(evt['slow_angle'], list) or evt['slow_angle'] is None) else float(
-                evt['slow_angle'])
-            info['delta'] = bool(evt['delta'])
-            info['delta_vs'] = 0.0 if (isinstance(evt['delta_vs'], list) or evt['delta_vs'] is None) else float(
-                evt['delta_vs'])
-            info['delta_angle'] = 0.0 if (
-                    isinstance(evt['delta_angle'], list) or evt['delta_angle'] is None) else float(
-                evt['delta_angle'])
-            info['theta'] = bool(evt['theta'])
-            info['theta_vs'] = 0.0 if (isinstance(evt['theta_vs'], list) or evt['theta_vs'] is None) else float(
-                evt['theta_vs'])
-            info['theta_angle'] = 0.0 if (
-                    isinstance(evt['theta_angle'], list) or evt['theta_angle'] is None) else float(
-                evt['theta_angle'])
-            info['spindle'] = bool(evt['spindle'])
-            info['spindle_vs'] = 0.0 if (isinstance(evt['spindle_vs'], list) or evt['spindle_vs'] is None) else float(
-                evt['spindle_vs'])
-            info['spindle_angle'] = 0.0 if (
-                    isinstance(evt['spindle_angle'], list) or evt['spindle_angle'] is None) else float(
-                evt['spindle_angle'])
+            # Compass sample --> 37% has slow == [] or None, map to None
+            parse_freq(info, 'slow', evt)
+            parse_freq(info, 'delta', evt)
+            parse_freq(info, 'theta', evt)
+            parse_freq(info, 'spindle', evt)
         else:
-            info['spike'] = bool(evt['spike'])
-            info['spike_vs'] = 0.0 if (isinstance(evt['spike_vs'], list) or evt['spike_vs'] is None) else float(
-                evt['spike_vs'])
-            info['spike_angle'] = 0.0 if (
-                    isinstance(evt['spike_angle'], list) or evt['spike_angle'] is None) else float(
-                evt['spike_angle'])
+            parse_freq(info, 'spike', evt)
 
         event = Event(info)
         electrode.add(event)
@@ -603,7 +573,18 @@ def parse_loc(doc, i):
     return loc
 
 
-# type of the event
+def parse_freq(info, freq_name, event):
+    info[freq_name] = bool(event[freq_name])
+    fq_vs_name = freq_name + '_vs'
+    fq_vs = event[fq_vs_name]
+    info[fq_vs_name] = None if isinstance(fq_vs, list) or fq_vs is None \
+                            else float(fq_vs)
+    fq_angle_name = freq_name + '_angle'
+    fq_angle = event[fq_angle_name]
+    info[fq_angle_name] = None if isinstance(fq_angle, list) or fq_angle is None\
+                               else float(fq_angle)
+
+    # type of the event
 def encode_type_name(name):  # Returns the type code number in the db for the event name from string
     return str(EVENT_TYPES.index(name) + 1)
 
