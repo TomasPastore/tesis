@@ -104,5 +104,8 @@ exp_save_path[3]['ii']['dir'] = str(Path(exp_save_path[3]['dir'],
 exp_save_path[3]['iii'] = str(Path(exp_save_path[3]['dir'],
                                '3_iii_pse_hfo_rate_auc_relation/pse_hfo_rate_auc_relation'))
 
+#orca dependency is required if you want automatically save plotly figs, if the
+#path doesnt exist it will code will skip this save
+orca_executable = '/home/tpastore/.nvm/versions/node/v14.5.0/bin/orca' #npm opt
 
 

@@ -34,7 +34,7 @@ class Database(object):
 def load_patients(electrodes_collection, evt_collection, intraop, loc_granularity, locations,
                   event_type_names, models_to_run, subtypes=None, allow_null_coords=True, allow_empty_loc=True,
                   rm_xyz_null=False, rm_loc_empty=False):
-    print('Loading patients...')
+    print('Loading patients from db...')
     loc, locations = get_locations(loc_granularity, locations)
     print('Locations: {0}'.format(locations))
     print('Event type names: {0}'.format(event_type_names))

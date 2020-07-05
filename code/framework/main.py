@@ -412,6 +412,7 @@ def evt_rate_soz_pred_baseline_whole_brain(elec_collection, evt_collection,
 
 
 # TODO merge and add spikes
+# TODO sunday
 def hfo_types_in_locations(elec_collection, evt_collection,
                            allow_null_coords_db=True,
                            allow_empty_loc_db=True, rm_xyz_null=True,

@@ -3,15 +3,17 @@ from decimal import Decimal
 import getpass
 from pathlib import Path
 from sys import version as py_version
-
+import requests
 import numpy as np
 import math as mt
 import sklearn.metrics as metrics
 from matplotlib import pyplot as plt, colors
 import plotly.graph_objects as go
+import plotly
 from sklearn.metrics import auc, roc_curve, precision_recall_curve, average_precision_score, plot_precision_recall_curve
 
-from config import EVENT_TYPES, intraop_patients, HFO_TYPES, color_list, models_to_run, models_dic, EXPERIMENTS_FOLDER
+from config import EVENT_TYPES, intraop_patients, HFO_TYPES, color_list, \
+    models_to_run, models_dic, EXPERIMENTS_FOLDER, orca_executable
 from models import estimators
 running_py_3_5 = py_version[2] == '5'
 if running_py_3_5:
@@ -41,7 +43,8 @@ def parse_elec_name(doc):
 
 # Plots ROCs for SOZ predictor by hfo rate for different locations and event types
 def event_rate_by_loc(hfo_type_data_by_loc, zoomed_type=None, metrics=['pse', 'pnee', 'auc'],
-                      title=None, colors=None, conf=None, saving_path= EXPERIMENTS_FOLDER):
+                      title=None, colors=None, conf=None,
+                      saving_path=EXPERIMENTS_FOLDER+'fig'):
 
     fig = plt.figure(107)
 
@@ -98,7 +101,7 @@ def event_rate_by_loc(hfo_type_data_by_loc, zoomed_type=None, metrics=['pse', 'p
                     type, rate_data['elec_count'], elec_count) )
                 raise RuntimeError('Elec count disagreement among types in ROCs plot')
 
-        superimposed_rocs(plot_data, title, axe, elec_count, colors)
+        superimposed_rocs(plot_data, title, axe, elec_count, colors, saving_path)
         subplot_index += 1
     plt.subplots_adjust(wspace=0.4, hspace=0.4)
     for fmt in ['pdf', 'png', 'eps']:
@@ -108,7 +111,8 @@ def event_rate_by_loc(hfo_type_data_by_loc, zoomed_type=None, metrics=['pse', 'p
 
 # Plots the ROCs of many types in a location given in plot_data, modifies the axe object
 # It also may build tables of the global info in that location if you uncomment that piece of code
-def superimposed_rocs(plot_data, title, axe, elec_count, colors=None):
+def superimposed_rocs(plot_data, title, axe, elec_count, colors=None,
+                      saving_path=None):
     axe.set_title(title, fontdict={'fontsize': 12}, loc='left')
     axe.plot([0, 1], [0, 1], 'r--')
     axe.set_xlim([0, 1])
@@ -156,14 +160,14 @@ def superimposed_rocs(plot_data, title, axe, elec_count, colors=None):
     columns = [title] + [k for k in ['ec', 'pse', 'pnee', 'AUC_ROC'] if
                          k in plot_data[t]['scores'].keys()] #Title here is the location
 
-    plot_score_in_loc_table(columns, rows, colors)
+    plot_score_in_loc_table(columns, rows, colors, saving_path)
 
     # method II: ggplot
     # df = pd.DataFrame(dict(fpr = fpr, tpr = tpr))
     # ggplot(df, aes(x = 'fpr', y = 'tpr')) + geom_line() + geom_abline(linetype = 'dashed')
 
 # Unique location info table
-def plot_score_in_loc_table(columns, rows, colors):
+def plot_score_in_loc_table(columns, rows, colors, saving_path):
     col_colors = [table_color_for(t) if colors is None else color_list[i] for i, t in enumerate(sorted([r[0] for r in rows]))]
     font_colors = ['black' if c != 'blue' else 'white' for c in col_colors]
     rows = sorted(rows, key=lambda x: x[0]) #Order by HFO type name
@@ -192,6 +196,19 @@ def plot_score_in_loc_table(columns, rows, colors):
             t=100,
             pad=4
         ))
+
+    if Path(orca_executable).exists():
+        print('Orca executable_path: {0}'.format(
+            plotly.io.orca.config.executable))
+        #plotly.io.orca.config.executable = orca_executable
+        #plotly.io.orca.config.save()
+        try:
+            fig.write_image(saving_path+'_in_loc_table.png')
+        except ValueError:
+            print('Orca executable is probably invalid, save figure manually.')
+    else:
+        print('You need to install orca and define orca executable path in '
+              'order to plotly tables.')
     fig.show()
 
 # Multiple location info table
