@@ -1,6 +1,8 @@
 
 # Classes
+#TODO split module
 from config import EVENT_TYPES, HFO_TYPES, models_to_run
+
 
 class Patient():
     def __init__(self, id, age):
@@ -41,6 +43,12 @@ class Patient():
                 else:
                     negative_class_count +=1
         return negative_class_count, positive_class_count, tot_count
+
+    # Determines if the patient has any electrode in loc
+    def has_elec_in(self, loc):
+        from db_parsing import get_granularity
+        return any([getattr(e, 'loc{i}'.format(i=get_granularity(loc)))
+                    == loc for e in self.electrodes])
 
     # Returns true iff the electrode has soz activity in loc_name
     def has_epilepsy_in_loc(self, granularity, loc_name):

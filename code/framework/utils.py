@@ -1,7 +1,7 @@
 
 import copy
 import math as mt
-from datetime import time, timedelta
+import time
 from itertools import chain, combinations
 from sys import version as py_version
 
@@ -82,10 +82,11 @@ def print_info(info_evts, file):
     print('List of patients with empty loc: {0}'.format(pat_with_empty_loc), file=file)
 
 def time_counter(callable_code):
-    start_time = time.time()
-    callable_code()
-    print('Runned in {0} seconds'.format(str(timedelta(seconds=time.time() - start_time))))
-
+    start_time = time.clock()
+    res = callable_code()
+    print('Runned in {0} minutes'.format( round((time.clock() -
+                                                 start_time)/60 ), 2))
+    return res
 def constant(f):
     def fset(self, value):
         raise TypeError('You cant modify this constant')

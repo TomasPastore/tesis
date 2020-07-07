@@ -42,10 +42,13 @@ def parse_elec_name(doc):
 # 3) Predicting SOZ with rate
 
 # Plots ROCs for SOZ predictor by hfo rate for different locations and event types
+# TODO hacer adaptativos los boxes
 def event_rate_by_loc(hfo_type_data_by_loc, zoomed_type=None, metrics=['pse', 'pnee', 'auc'],
                       title=None, colors=None, conf=None,
-                      saving_path=EXPERIMENTS_FOLDER+'fig'):
-
+                      roc_saving_path=EXPERIMENTS_FOLDER + 'fig',
+                      change_tab_path=None):
+    print('Plotting event rate by loc...')
+    plt.ioff()
     fig = plt.figure(107)
 
     # Subplots frames
@@ -101,13 +104,20 @@ def event_rate_by_loc(hfo_type_data_by_loc, zoomed_type=None, metrics=['pse', 'p
                     type, rate_data['elec_count'], elec_count) )
                 raise RuntimeError('Elec count disagreement among types in ROCs plot')
 
-        superimposed_rocs(plot_data, title, axe, elec_count, colors, saving_path)
+        change_tab_path = roc_saving_path if change_tab_path is None else \
+            str(Path(Path(roc_saving_path).parent,
+                     loc.replace(' ','_'),
+                     '3_ii_{l}_sleep_tagged'.format(l=loc.replace(' ','_'))
+                     ))
+        superimposed_rocs(plot_data, title, axe, elec_count, colors, change_tab_path)
         subplot_index += 1
     plt.subplots_adjust(wspace=0.4, hspace=0.4)
-    for fmt in ['pdf', 'png', 'eps']:
-        saving_path_f = '{file_path}.{format}'.format(file_path=saving_path, format=fmt)
+    for fmt in ['pdf', 'png']:
+        saving_path_f = '{file_path}.{format}'.format(file_path=roc_saving_path, format=fmt)
+        if fmt == 'pdf':
+            print('ROC saving path: {0}'.format(saving_path_f))
         plt.savefig(saving_path_f, bbox_inches='tight')
-    plt.show()
+    #plt.show()
 
 # Plots the ROCs of many types in a location given in plot_data, modifies the axe object
 # It also may build tables of the global info in that location if you uncomment that piece of code
@@ -198,8 +208,8 @@ def plot_score_in_loc_table(columns, rows, colors, saving_path):
         ))
 
     if Path(orca_executable).exists():
-        print('Orca executable_path: {0}'.format(
-            plotly.io.orca.config.executable))
+        #print('Orca executable_path: {0}'.format(
+        #    plotly.io.orca.config.executable))
         #plotly.io.orca.config.executable = orca_executable
         #plotly.io.orca.config.save()
         try:
@@ -209,47 +219,68 @@ def plot_score_in_loc_table(columns, rows, colors, saving_path):
     else:
         print('You need to install orca and define orca executable path in '
               'order to plotly tables.')
-    fig.show()
+
+    #fig.show()
 
 # Multiple location info table
-def plot_score_table(t1):
+def plot_pse_hfo_rate_auc_table(data_by_loc):
     np.random.seed(1)
     col_colors = []
     rows = []
-    for loc, type_info in t1.items():
+    for loc, data in data_by_loc.items():
         row = []
         granularity = get_granularity(loc)
         row.append(granularity)
         row.append(loc)
-        for type, v in sorted(list(type_info.items()), key=lambda p: p[0]):
-            row.append(round(v, 2))
+        row.append(data['PSE'])
+        sorted_types = sorted(HFO_TYPES)
+        for type in sorted_types:
+            row.append(round( data[type+'_AUC'], 2))
         rows.append(tuple(row))
 
+    # Order by granularity, loc_name
     rows = sorted(rows, key=lambda x: (x[0], x[1]))
     for row in rows:
         col_colors.append(color_by_gran(row[0]))
 
     fig = go.Figure(
         data=[go.Table(
-            columnwidth=[200, 300, 200, 200, 200, 200],
+            columnwidth=[300, 500, 200, 200, 200, 200, 200],
             header=dict(
-                values=['<b>Granularity</b>', '<b>location</b>', '<b>Fast RonO</b>',
-                        '<b>Fast RonS</b>', '<b>RonO</b>', '<b>RonS</b>'],
+                values=['{b}Granularity{b}'.format(b='<b>'),
+                        '{b}Location{b}'.format(b='<b>'),
+                        '{b}PSE{b}'.format(b='<b>'),
+                        '{b}{t}{b}'.format(b='<b>', t=sorted_types[0]),
+                        '{b}{t}{b}'.format(b='<b>', t=sorted_types[1]),
+                        '{b}{t}{b}'.format(b='<b>', t=sorted_types[2]),
+                        '{b}{t}{b}'.format(b='<b>', t=sorted_types[3]),
+                        ],
                 line_color='black', fill_color='white',
                 align='left', font=dict(color='black', size=10)
             ),
             cells=dict(
-                values=[[r[i] for r in rows] for i in range(6)],
-                fill_color=[np.array(col_colors) for i in range(6)],
+                values=[[r[i] for r in rows] for i in range(7)],
+                fill_color=[np.array(col_colors) for i in range(7)],
                 align='left', font=dict(color='black', size=8)
             ))
         ])
-    fig.update_layout(width=1300)
+
+    fig.update_layout(
+        autosize=False,
+        width=500,
+        height=500,
+        margin=dict(
+            l=50,
+            r=50,
+            b=100,
+            t=100,
+            pad=4
+        ))
     fig.show()
 
 
 
-#RELATION TODO
+#RELATION TODO WEDNESDAY
 def plot_co_metric_auc_0(m_tab, a_tab):
     ms = []
     aucs = []
@@ -264,7 +295,7 @@ def plot_co_metric_auc_0(m_tab, a_tab):
     X_plot = np.linspace(axes.get_xlim()[0], axes.get_xlim()[1], 100)
     plt.plot(X_plot, m * X_plot + b, '-')
     plt.xlabel('Pathologic score')
-    plt.ylabel('AUC ROC7')
+    plt.ylabel('AUC ROC')
     plt.title('Pathologic score and AUC ROC correlation')
     plt.savefig("/home/tpastore/pscore_auc_correlation.png", bbox_inches='tight')
     plt.show()
@@ -898,6 +929,8 @@ def color_for(t):
         return colors[int(t[-1])]
     if t == 'HFOs':
         return 'b'
+    if t == 'RonO+RonS+Fast RonO+Fast RonS':
+        return 'b'
     if t == 'RonO':
         return 'b'
     if t == 'RonS':
@@ -925,6 +958,8 @@ def color_for(t):
 
 def table_color_for(t):
     if t == 'HFOs':
+        return 'blue'
+    if t == 'RonO+RonS+Fast RonO+Fast RonS':
         return 'blue'
     if t == 'RonO':
         return 'blue'

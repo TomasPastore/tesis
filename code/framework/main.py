@@ -6,7 +6,7 @@ import time
 import warnings
 from pathlib import Path
 
-warnings.filterwarnings("ignore")
+warnings.filterwarnings("ignore", module="matplotlib")
 warnings.simplefilter(action='ignore', category=FutureWarning)
 import numpy as np
 from matplotlib import \
@@ -20,6 +20,7 @@ from config import (EVENT_TYPES, HFO_TYPES, exp_save_path, TEST_BEFORE_RUN,
                     intraop_patients, non_intraop_patients,
                     electrodes_query_fields, hfo_query_fields, models_to_run)
 from db_parsing import Database, parse_patients, get_locations, \
+    get_granularity, \
     encode_type_name, all_loc_names, load_patients, query_filters, \
     all_subtype_names
 from metrics import print_metrics
@@ -29,13 +30,10 @@ from ml_hfo_classifier import phfo_filter, phfo_predictor, gather_folds, \
 running_py_3_5 = py_version[2] == '5'
 if running_py_3_5:
     from utils import histograms, phase_coupling_paper_polar
-from utils import all_subsets, LOG, print_info
+from utils import all_subsets, LOG, print_info, time_counter
 import tests
 import unittest
 import graphics
-
-
-# TODO move to main and pass collections by parameters
 
 def main():
     db = Database()
@@ -47,8 +45,8 @@ def main():
         # TODO Agregar a informe, tests
         unittest.main(tests, exit=False)
 
-    run_experiment(elec_collection, evt_collection, number=3, roman_num='0',
-                   letter='a')
+    run_experiment(elec_collection, evt_collection, number=3, roman_num='iii',
+                   letter='b')
 
     # TODO week 26/7 dump to overleaf reeplazing commented structure to code structure with if
     # Trabajo futuro combinacion de subtipos, mas datos,
@@ -81,10 +79,10 @@ def run_experiment(elec_collection, evt_collection, number, roman_num,
         # Se quiere mejorar el rendimiento del rate de los distintos tipos
         # de HFO, para eso veamos los baselines
         # TODO move to soz_predictor module
+        # TODO add to overleaf
         if roman_num == '0':
             print('Running exp 3.0) Predicting SOZ with rates: Baselines '
                   '(first steps)')
-            # TODO add to overleaf
             evt_rate_soz_pred_baseline_whole_brain(elec_collection,
                                                    evt_collection,
                                                    intraop=False,
@@ -101,23 +99,23 @@ def run_experiment(elec_collection, evt_collection, number, roman_num,
             # TODO add to overleaf
             if letter == 'a':
                 print('Running exp 3.i.a) Predicting SOZ with rates: '
-                    'Baselines (Whole brain coords untagged)')
+                      'Baselines (Whole brain coords untagged)')
                 # Ma)ML with 91 patients without using coords (untagged)
                 # Whole brain rates for independent event types:
                 evt_rate_soz_pred_baseline_whole_brain(elec_collection,
-                                                   evt_collection,
-                                                   intraop=False,
-                                                   load_untagged_coords_from_db=True,
-                                                   load_untagged_loc_from_db=True,
-                                                   restrict_to_tagged_coords=False,
-                                                   restrict_to_tagged_locs=False,
-                                                   evt_types_to_load=HFO_TYPES+['Spikes'],
-                                                   evt_types_to_cmp=[[t] for
-                                                                     t in HFO_TYPES+['Spikes']],
-                                                   saving_path=exp_save_path[
-                                                       3]['i']['a'])
+                                                       evt_collection,
+                                                       intraop=False,
+                                                       load_untagged_coords_from_db=True,
+                                                       load_untagged_loc_from_db=True,
+                                                       restrict_to_tagged_coords=False,
+                                                       restrict_to_tagged_locs=False,
+                                                       evt_types_to_load=HFO_TYPES+['Spikes'],
+                                                       evt_types_to_cmp=[[t] for
+                                                                         t in HFO_TYPES+['Spikes']],
+                                                       saving_path=exp_save_path[
+                                                           3]['i']['a'])
             elif letter == 'b':
-                print('Running exp 3.i.B) Predicting SOZ with rates: '
+                print('Running exp 3.i.b) Predicting SOZ with rates: '
                       'Baselines (Whole brain coords tagged)')
                 # Mb) 57 patients with tagged coords.
                 # NOTE: V0_ if you just dont load untagged coords from db,
@@ -134,32 +132,37 @@ def run_experiment(elec_collection, evt_collection, number, roman_num,
                                                        evt_types_to_load=HFO_TYPES + [
                                                            'Spikes'],
                                                        evt_types_to_cmp=[[t] for
-                                                                     t in HFO_TYPES+['Spikes']],
+                                                                         t in HFO_TYPES+['Spikes']],
                                                        saving_path=
                                                        exp_save_path[
                                                            3]['i']['b'])
             else:  # letter
                 raise NOT_IMPLEMENTED_EXP
         elif roman_num == 'ii':
-            print('Running exp 3.ii.a) Predicting SOZ with rates: '
+            print('Running exp 3.ii. Predicting SOZ with rates: '
                   'Baselines (Localized x,y,z and loc tagged)')
-            # TODO agregar spikes y revisar all zones
-            # Localized solo hay un baseline que es el que tiene taggeado los
-            # x,y,z y el loc porque tienen que tener la loc definida
-            # Se carga toda la base, se resuelve inconsitencias y
-            # luego se clasifica por loc del electrodo.
-            # TODO now
-            raise NOT_IMPLEMENTED_EXP
-            hfo_types_in_locations(elec_collection, evt_collection,
-                                   allow_null_coords_db=True,
-                                   allow_empty_loc_db=True, rm_xyz_null=True,
-                                   rm_loc_empty=True)
+
+            def test_localized_time():
+                evt_rate_soz_pred_baseline_localized(elec_collection,
+                                                     evt_collection,
+                                                     intraop=False,
+                                                     load_untagged_coords_from_db=True,
+                                                     load_untagged_loc_from_db=True,
+                                                     restrict_to_tagged_coords=True,
+                                                     restrict_to_tagged_locs=True,
+                                                     evt_types_to_load=HFO_TYPES + [
+                                                       'Spikes'],
+                                                     evt_types_to_cmp=[[t] for
+                                                                     t in
+                                                                     HFO_TYPES + [
+                                                                         'Spikes']],
+                                                     saving_path=
+                                                     exp_save_path[3]['ii']['dir'] )
+            time_counter(test_localized_time)
         elif roman_num == 'iii':
-            # TODO 4/7
             print('Running exp 3.iii: Proportion of soz electrodes AUC '
                   'relation')
-            raise NOT_IMPLEMENTED_EXP
-            # pse_hfo_rate_auc_relation(elec_collection, evt_collection)
+            pse_hfo_rate_auc_relation(elec_collection, evt_collection)
         else:  # roman_num
             raise NOT_IMPLEMENTED_EXP
     elif number == 4:
@@ -209,8 +212,8 @@ def global_info_in_locations(elec_collection, evt_collection, intraop=False,
     patients_by_loc = load_patients(elec_collection, evt_collection, intraop,
                                     loc_granularity, locations,
                                     event_type_names, models_to_run,
-                                    allow_null_coords=True,
-                                    allow_empty_loc=True)
+                                    load_untagged_coords_from_db=True,
+                                    load_untagged_loc_from_db=True)
     for loc_name in patients_by_loc.keys():
         patients_dic = patients_by_loc[loc_name]
         info = region_info(patients_dic, event_types=event_type_names,
@@ -224,11 +227,12 @@ def show_patients_by_epilepsy_loc(elec_collection, evt_collection,
                                   locations='all',
                                   event_type_names=EVENT_TYPES,
                                   soz_restricted=[''], soz_required=None):
+
     patients_by_loc = load_patients(elec_collection, evt_collection, intraop,
                                     loc_granularity, locations,
                                     event_type_names,
-                                    models_to_run, allow_null_coords=True,
-                                    allow_empty_loc=True)
+                                    models_to_run, load_untagged_coords_from_db=True,
+                                    load_untagged_loc_from_db=True)
     loc_name = [loc for loc in patients_by_loc.keys()][0]
     patients_dic = patients_by_loc[loc_name]
 
@@ -355,6 +359,7 @@ def phfo_analysis_zoom(electrodes_collection, hfo_collection, loc_name,
 
 
 # 3) Predicting SOZ with rates: Baselines  #####################################
+# 3i
 def evt_rate_soz_pred_baseline_whole_brain(elec_collection, evt_collection,
                                            intraop=False,
                                            load_untagged_coords_from_db=True,
@@ -374,15 +379,17 @@ def evt_rate_soz_pred_baseline_whole_brain(elec_collection, evt_collection,
         'restrict_to_tagged_coords: {0}'.format(str(restrict_to_tagged_coords)))
     print('restrict_to_tagged_locs: {0}'.format(str(restrict_to_tagged_locs)))
 
-    patients_by_loc = load_patients(elec_collection, evt_collection, intraop,
-                                    loc_granularity=0,
-                                    locations=['Whole Brain'],
-                                    event_type_names=evt_types_to_load,
-                                    models_to_run=models_to_run,
-                                    allow_null_coords=load_untagged_coords_from_db,
-                                    allow_empty_loc=load_untagged_loc_from_db,
-                                    rm_xyz_null=restrict_to_tagged_coords,
-                                    rm_loc_empty=restrict_to_tagged_locs)
+    def load_patients_input():
+        return load_patients(elec_collection, evt_collection, intraop,
+                             loc_granularity=0,
+                             locations=['Whole Brain'],
+                             event_type_names=evt_types_to_load,
+                             models_to_run=models_to_run,
+                             load_untagged_coords_from_db=load_untagged_coords_from_db,
+                             load_untagged_loc_from_db=load_untagged_loc_from_db,
+                             restrict_to_tagged_coords=restrict_to_tagged_coords,
+                             restrict_to_tagged_locs=restrict_to_tagged_locs)
+    patients_by_loc = time_counter(load_patients_input)
 
     loc_name = first_key(patients_by_loc)
     patients_dic = patients_by_loc[loc_name]
@@ -392,11 +399,14 @@ def evt_rate_soz_pred_baseline_whole_brain(elec_collection, evt_collection,
     # Create info header
     info_saving_path = saving_path + '_info.txt'
     #Create parents dirs if they dont exist
-    Path(info_saving_path).parent.mkdir(0o755, parents=True, exist_ok=True)
+    Path(info_saving_path).parent.mkdir(0o777, parents=True, exist_ok=True)
     with open(info_saving_path, "w+") as file:
-        file.write('Info data for Event types to compare... \n')
+        print('Info data for Event types to compare...', file=file)
         for event_type_names in evt_types_to_cmp:
             type_group_name = '+'.join(event_type_names)
+            type_group_name = 'HFOs' if type_group_name =='RonO+RonS+Fast ' \
+                                                          'RonO+Fast RonS' \
+                else type_group_name
             print('\nInfo from: {n}'.format(n=type_group_name), file=file)
             event_type_data_by_loc[loc_name][type_group_name] = region_info(
                                                                 patients_dic,
@@ -404,57 +414,150 @@ def evt_rate_soz_pred_baseline_whole_brain(elec_collection, evt_collection,
             print_info(event_type_data_by_loc[loc_name][type_group_name],
                         file=file)
 
-    print('Plotting...')
     graphics.event_rate_by_loc(event_type_data_by_loc,
                                metrics=['pse', 'pnee', 'auc'],
-                               saving_path=saving_path)
-    plt.show()
+                               roc_saving_path=saving_path)
 
 
-# TODO merge and add spikes
-# TODO sunday
-def hfo_types_in_locations(elec_collection, evt_collection,
-                           allow_null_coords_db=True,
-                           allow_empty_loc_db=True, rm_xyz_null=True,
-                           rm_loc_empty=False):
-    locations = ['Whole brain'] + all_loc_names(2) + all_loc_names(
-        3) + all_loc_names(5)
-    # Saves pse and AUC ROC of each HFO type of baseline rate
-    columns = {c: 0 for c in ['PSE', HFO_TYPES]}
-    baseline_info_by_loc = {loc: copy.deepcopy(columns) for loc in locations}
-    compare_event_type_rates_by_loc(elec_collection, evt_collection,
+# 3 ii
+# Localized solo hay un baseline que es el que tiene taggeado los
+# x,y,z y el loc porque tienen que tener la loc definida
+# Se hace un llamado a la db por localizacion porque no hace falta
+# Doesnt care of angles null, in ml we will zoom that.
+# TODO ver la cantidad de electrodos empty para hacer combinacion de tipos
+# FIXME no se estan guardando los graficos y tablas, solo el txt
+def evt_rate_soz_pred_baseline_localized(elec_collection,
+                                         evt_collection,
+                                         intraop=False,
+                                         load_untagged_coords_from_db=True,
+                                         load_untagged_loc_from_db=True,
+                                         restrict_to_tagged_coords=True,
+                                         restrict_to_tagged_locs=True,
+                                         evt_types_to_load=HFO_TYPES + [
+                                           'Spikes'],
+                                         evt_types_to_cmp=[[t] for
+                                                         t in
+                                                         HFO_TYPES + [
+                                                             'Spikes']],
+                                         saving_path=
+                                         exp_save_path[3]['ii']['dir'] ):
+
+    print('SOZ predictor localized')
+    print('Intraop: {intr}'.format(intr=intraop))
+    print('load_untagged_coords_from_db: {0}'.format(
+        str(load_untagged_coords_from_db)))
+    print(
+        'load_untagged_loc_from_db: {0}'.format(str(load_untagged_loc_from_db)))
+    print(
+        'restrict_to_tagged_coords: {0}'.format(str(restrict_to_tagged_coords)))
+    print('restrict_to_tagged_locs: {0}'.format(str(restrict_to_tagged_locs)))
+    print(elec_collection.distinct('loc2'))
+    print(elec_collection.distinct('loc3'))
+    print(elec_collection.distinct('loc5'))
+    print(evt_collection.distinct('loc2'))
+    print(evt_collection.distinct('loc3'))
+    print(evt_collection.distinct('loc5'))
+
+    patients_by_loc = None # necessary? i think its not
+    local_filter = True
+    if local_filter:
+        patients_by_loc = load_patients(elec_collection, evt_collection,
+                                        intraop,
                                     loc_granularity=0,
-                                    event_type_names=HFO_TYPES,
-                                    bs_info_by_loc=baseline_info_by_loc,
-                                    saving_path=EXPERIMENTS_FOLDER)
-    compare_event_type_rates_by_loc(elec_collection, evt_collection,
-                                    loc_granularity=2,
-                                    event_type_names=HFO_TYPES,
-                                    bs_info_by_loc=baseline_info_by_loc,
-                                    saving_path=EXPERIMENTS_FOLDER)
-    compare_event_type_rates_by_loc(elec_collection, evt_collection,
-                                    loc_granularity=3,
-                                    event_type_names=HFO_TYPES,
-                                    bs_info_by_loc=baseline_info_by_loc,
-                                    saving_path=EXPERIMENTS_FOLDER)
-    compare_event_type_rates_by_loc(elec_collection, evt_collection,
-                                    loc_granularity=5,
-                                    event_type_names=HFO_TYPES,
-                                    bs_info_by_loc=baseline_info_by_loc,
-                                    saving_path=EXPERIMENTS_FOLDER)
+                                    locations=['Whole Brain'],
+                                    event_type_names=evt_types_to_load,
+                                    models_to_run=models_to_run,
+                                    load_untagged_coords_from_db=load_untagged_coords_from_db,
+                                    load_untagged_loc_from_db=load_untagged_loc_from_db,
+                                    restrict_to_tagged_coords=restrict_to_tagged_coords,
+                                    restrict_to_tagged_locs=restrict_to_tagged_locs)
 
-    # TODO merge
-    # evt_rate_soz_predictor_hfo_types_vs_spikes_whole_brain(elec_collection, evt_collection, allow_null_coords=True,
-    #                                                       allow_empty_loc=True, rm_xyz_null=True, rm_loc_empty=False)
+    locations = [all_loc_names(2) , all_loc_names(3), all_loc_names(5)]
+    # Saves pse and AUC ROC of each HFO type of baseline rate
+    data_by_loc = dict()
+    for granularity, locs in zip([2, 3, 5], locations):
+        if not local_filter:
+            patients_by_loc =load_patients(elec_collection, evt_collection, intraop,
+                                           loc_granularity=granularity,
+                                           locations=locs,
+                                           event_type_names=evt_types_to_load,
+                                           models_to_run=models_to_run,
+                                           load_untagged_coords_from_db=load_untagged_coords_from_db,
+                                           load_untagged_loc_from_db=load_untagged_loc_from_db,
+                                           restrict_to_tagged_coords=restrict_to_tagged_coords,
+                                           restrict_to_tagged_locs=restrict_to_tagged_locs)
+
+        event_type_data_by_loc = dict()
+        for loc_name in locs: #old cond: patients_dic in
+            # patients_by_loc.items() works with location = None
+            data_by_loc[loc_name] = dict()
+            event_type_data_by_loc[loc_name] = dict()
+            if local_filter:
+                whole_brain_name = first_key(patients_by_loc)
+                patients_dic = patients_by_loc[whole_brain_name] #whole_brain_name
+            else:
+                patients_dic = patients_by_loc[loc_name]
+            # Create info header
+            file_saving_path = str( Path(saving_path,
+                                    'loc_{g}'.format(g=granularity),
+                                    loc_name.replace(' ','_'),
+                                    '3_ii_'+
+                                    loc_name.replace(' ','_')+
+                                    '_sleep_tagged' ))
+            print('Files_saving_path {0}'.format(file_saving_path))
+            # Create parents dirs if they dont exist
+            info_saving_path = file_saving_path + '_info.txt'
+            Path(info_saving_path).parent.mkdir(0o777, parents=True, exist_ok=True)
+
+            with open(info_saving_path, "w+") as file:
+                print('Info data in '+loc_name+' for Event types to compare... ',
+                      file=file)
+                for event_type_names in evt_types_to_cmp:
+                    type_group_name = '+'.join(event_type_names)
+                    print('\nInfo from: {n}'.format(n=type_group_name), file=file)
+                    event_type_data_by_loc[loc_name][type_group_name] = region_info(
+                        patients_dic,
+                        event_type_names,
+                        location=loc_name if local_filter else None)
+                    print_info(event_type_data_by_loc[loc_name][type_group_name],
+                               file=file)
+
+                    # Data for 3.iii table
+                    data_by_loc[loc_name]['PSE'] = event_type_data_by_loc[
+                        loc_name][type_group_name][
+                        'pse']
+                    data_by_loc[loc_name][type_group_name + '_AUC'] = \
+                        event_type_data_by_loc[loc_name][type_group_name]['AUC_ROC']
+
+        graphics.event_rate_by_loc(event_type_data_by_loc,
+                                   metrics=['pse', 'pnee', 'auc'],
+                                   roc_saving_path=str(Path(saving_path,
+                                    'loc_{g}'.format(g=granularity),
+                                    '3_ii_sleep_tagged')),
+                                   change_tab_path=True)
+
+    return data_by_loc
 
 
+# 3 iii
+# Only for HFOs, not Spikes
 def pse_hfo_rate_auc_relation(elec_collection, evt_collection):
-    pass
+    data_by_loc = evt_rate_soz_pred_baseline_localized(elec_collection,
+                                             evt_collection,
+                                             intraop=False,
+                                             load_untagged_coords_from_db=True,
+                                             load_untagged_loc_from_db=True,
+                                             restrict_to_tagged_coords=True,
+                                             restrict_to_tagged_locs=True,
+                                             evt_types_to_load=HFO_TYPES,
+                                             evt_types_to_cmp=[[t] for
+                                                               t in
+                                                               HFO_TYPES],
+                                             saving_path=
+                                             exp_save_path[3]['iii']['dir'])
 
-
-# graphics.plot_score_table(bs_info_by_loc)
-# graphics.plot_co_metrics_auc(tables['proportion'], tables['pse'], tables['AUC_ROC'])
-# graphics.plot_co_metric_auc_0(tables['pscore'], tables['AUC_ROC'])
+    graphics.plot_pse_hfo_rate_auc_table(data_by_loc)
+    # graphics.plot_co_pse_auc(bs_info_by_loc)
 
 
 # 5) ML HFO classifiers
@@ -709,8 +812,10 @@ def simulator(elec_collection, evt_collection):
 ###################             Auxiliary functions             #########################################
 
 # Gathers info about patients rate data for the types included in the list
-def region_info(patients_dic, event_types=EVENT_TYPES, flush=False, conf=None):
-    print('Gathering info for types {0}.'.format(event_types))
+# If loc is None all the dic is considered, otherwise only the location asked
+def region_info(patients_dic, event_types=EVENT_TYPES, flush=False,
+                conf=None, location=None):
+    #print('Region info location {0}, types {1}.'.format(location, event_types))
     patients_with_epilepsy = set()
     elec_count_per_patient = []
     elec_x_null, elec_y_null, elec_z_null = 0, 0, 0  # todo create dic
@@ -720,9 +825,23 @@ def region_info(patients_dic, event_types=EVENT_TYPES, flush=False, conf=None):
     soz_elec_count, elec_with_evt_count, event_count = 0, 0, 0
     counts = {type: 0 for type in event_types}
     event_rates, soz_labels = [], []
+    if location is not None:
+        patients_dic = {p_name: p for p_name, p in patients_dic.items() if \
+                p.has_elec_in(loc=location)}
+
     for p_name, p in patients_dic.items():
-        elec_count_per_patient.append(len(p.electrodes))
-        for e in p.electrodes:
+        if location is None:
+            electrodes = p.electrodes
+        else:
+            electrodes = [e for e in p.electrodes if getattr(e,
+                                                             'loc{'
+                                                             'i}'.format(i=
+                                                                 get_granularity(location)))
+                         == location]
+
+        elec_count_per_patient.append(len(electrodes))
+        assert(len(electrodes)>0)
+        for e in electrodes:
             if flush:
                 e.flush_cache(event_types)
             if e.soz:
@@ -837,7 +956,6 @@ def compare_event_type_rates_by_loc(elec_collection, evt_collection,
 
     graphics.event_rate_by_loc(event_type_data_by_loc, saving_path)
 
-
 def compare_subtypes_rate_by_loc(elec_collection, evt_collection, hfo_type_name,
                                  subtypes='all', loc_granularity=0,
                                  locations='all',
@@ -875,7 +993,7 @@ def compare_subtypes_rate_by_loc(elec_collection, evt_collection, hfo_type_name,
                                                                [hfo_type_name])
 
     graphics.event_rate_by_loc(subtype_data_by_loc, zoomed_type=hfo_type_name,
-                               saving_path=saving_path)
+                               roc_saving_path=saving_path)
     plt.show()
 
 

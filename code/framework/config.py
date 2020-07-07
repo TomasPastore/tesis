@@ -78,9 +78,8 @@ experiment_default_path = str(Path(EXPERIMENTS_FOLDER, 'exp') )
 exp_save_path = dict() #7 'Experiments'
 
 exp_save_path[1] = str(Path(EXPERIMENTS_FOLDER, '1_global_data/global_data'))
-
 exp_save_path[2] = dict()
-exp_save_path[2]['dir'] = str(Path(EXPERIMENTS_FOLDER, '2_rate_soz_vs_nsoz/'))
+exp_save_path[2]['dir'] = str(Path(EXPERIMENTS_FOLDER, '2_rate_soz_vs_nsoz'))
 exp_save_path[2]['i'] = str(Path(exp_save_path[2]['dir'],'i_whole_brain/whole_brain'))
 exp_save_path[2]['ii'] = str(Path(exp_save_path[2]['dir'],
                                   'ii_whole_brain/localized'))
@@ -88,10 +87,10 @@ exp_save_path[2]['ii'] = str(Path(exp_save_path[2]['dir'],
 exp_save_path[3] = dict()
 exp_save_path[3]['dir'] = str(Path(EXPERIMENTS_FOLDER, '3_predicting_soz_with_rate/'))
 exp_save_path[3]['0'] = str(Path(exp_save_path[3]['dir'],
-                                 '/3_0_first_steps/hfos_and_spikes'))
+                                 '3_0_first_steps/hfos_and_spikes'))
 exp_save_path[3]['i'] = dict()
 exp_save_path[3]['i']['dir'] = str(Path(exp_save_path[3]['dir'],
-                               '3_i_whole_brain/'))
+                               '3_i_whole_brain'))
 exp_save_path[3]['i']['a'] = str(Path(exp_save_path[3]['i']['dir'],
                                       '3_i_a_all_sleep_data/3_i_a_all_sleep_data'))
 exp_save_path[3]['i']['b'] = str(Path(exp_save_path[3]['i']['dir'],
@@ -99,13 +98,14 @@ exp_save_path[3]['i']['b'] = str(Path(exp_save_path[3]['i']['dir'],
 
 exp_save_path[3]['ii'] = dict()
 exp_save_path[3]['ii']['dir'] = str(Path(exp_save_path[3]['dir'],
-                                 '3_ii_localized/'))
+                                 '3_ii_localized'))
 
-exp_save_path[3]['iii'] = str(Path(exp_save_path[3]['dir'],
-                               '3_iii_pse_hfo_rate_auc_relation/pse_hfo_rate_auc_relation'))
+exp_save_path[3]['iii'] =  dict()
+exp_save_path[3]['iii']['dir'] = str(Path(exp_save_path[3]['dir'],
+                               '3_iii_pse_hfo_rate_auc_relation'))
 
 #orca dependency is required if you want automatically save plotly figs, if the
-#path doesnt exist it will code will skip this save
+#path doesnt exist code will skip this save
 orca_executable = '/home/tpastore/.nvm/versions/node/v14.5.0/bin/orca' #npm opt
 
 
