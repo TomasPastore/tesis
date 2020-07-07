@@ -556,7 +556,8 @@ def pse_hfo_rate_auc_relation(elec_collection, evt_collection):
                                              saving_path=
                                              exp_save_path[3]['iii']['dir'])
 
-    graphics.plot_pse_hfo_rate_auc_table(data_by_loc)
+    graphics.plot_pse_hfo_rate_auc_table(data_by_loc, str(Path(exp_save_path[3][
+        'iii']['dir'], 'table')))
     # graphics.plot_co_pse_auc(bs_info_by_loc)
 
 

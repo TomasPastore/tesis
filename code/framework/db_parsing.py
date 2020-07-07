@@ -216,7 +216,7 @@ def parse_electrodes(patients, elec_cursor, event_type_names):
                     msg_type='LOC5',
                     patient=patient.id,
                     electrode=electrode.name
-                    )
+                )
                 if loc5 == 'Hippocampus':  # Priority
                     electrode.loc5 = loc5
 
@@ -556,7 +556,7 @@ def parse_soz(db_representation_str):  # SOZ is True if soz = "1" in db
 # Segun la muestra de compass no hay listas en este campo pero creo que habia saltado error asi que pongo el valor de null en la db
 def parse_coord(param):  # -1 Represents empty, consider filtering
     parsed_coord = None if (
-                isinstance(param, list) or param == '-1') else float(param)
+            isinstance(param, list) or param == '-1') else float(param)
     # if parsed_coord is None: #Just to check a buggy branch with coord=[] from db
     #    print('Coord parsed to None from elec: {0}'.format(param))
     #    print(type(param))
@@ -605,6 +605,51 @@ def ALL_loc_names(granularity):
                 'Brodmann area 9', 'Caudate Body', 'Caudate Head',
                 'Caudate Tail', 'Hippocampus', 'Lateral Globus Pallidus',
                 'Pulvinar', 'Putamen', 'empty', []]
+    else:
+        raise RuntimeError('Granularity not defined')
+
+
+def all_loc_names_test(granularity):
+    if granularity == 2:
+        return ['Frontal Lobe', 'Temporal Lobe', 'Parietal Lobe',
+                'Limbic Lobe', 'Occipital Lobe']
+    elif granularity == 3:
+        # removed: 'Extra-Nuclear',
+        return ['Angular Gyrus', 'Anterior Cingulate', 'Caudate',
+                'Cerebellar Tonsil', 'Cingulate Gyrus', 'Claustrum', 'Culmen',
+                'Cuneus', 'Declive',  'Fusiform Gyrus',
+                'Inferior Frontal Gyrus', 'Inferior Occipital Gyrus',
+                'Inferior Parietal Lobule', 'Inferior Temporal Gyrus', 'Insula',
+                'Lentiform Nucleus', 'Lingual Gyrus', 'Medial Frontal Gyrus',
+                'Middle Frontal Gyrus', 'Middle Occipital Gyrus',
+                'Middle Temporal Gyrus', 'Orbital Gyrus', 'Paracentral Lobule',
+                'Parahippocampal Gyrus', 'Postcentral Gyrus',
+                'Posterior Cingulate', 'Precentral Gyrus', 'Precuneus',
+                'Pyramis', 'Sub-Gyral', 'Subcallosal Gyrus',
+                'Superior Frontal Gyrus', 'Superior Occipital Gyrus',
+                'Superior Parietal Lobule', 'Superior Temporal Gyrus',
+                'Supramarginal Gyrus', 'Thalamus', 'Transverse Temporal Gyrus',
+                'Tuber', 'Uncus']
+
+
+    elif granularity == 5:
+        return ['Amygdala', 'Brodmann area 1', 'Brodmann area 10',
+                'Brodmann area 11', 'Brodmann area 13', 'Brodmann area 17',
+                'Brodmann area 18', 'Brodmann area 19', 'Brodmann area 2',
+                'Brodmann area 20', 'Brodmann area 21', 'Brodmann area 22',
+                'Brodmann area 23', 'Brodmann area 24', 'Brodmann area 25',
+                'Brodmann area 27', 'Brodmann area 28', 'Brodmann area 29',
+                'Brodmann area 3', 'Brodmann area 30', 'Brodmann area 31',
+                'Brodmann area 32', 'Brodmann area 33', 'Brodmann area 34',
+                'Brodmann area 35', 'Brodmann area 36', 'Brodmann area 37',
+                'Brodmann area 37 ', 'Brodmann area 38', 'Brodmann area 39',
+                'Brodmann area 4', 'Brodmann area 40', 'Brodmann area 41',
+                'Brodmann area 42', 'Brodmann area 44', 'Brodmann area 45',
+                'Brodmann area 46', 'Brodmann area 47', 'Brodmann area 5',
+                'Brodmann area 6', 'Brodmann area 7', 'Brodmann area 8',
+                'Brodmann area 9', 'Caudate Body', 'Caudate Head',
+                'Caudate Tail', 'Hippocampus', 'Lateral Globus Pallidus',
+                'Pulvinar', 'Putamen']
     else:
         raise RuntimeError('Granularity not defined')
 

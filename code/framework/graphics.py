@@ -223,7 +223,7 @@ def plot_score_in_loc_table(columns, rows, colors, saving_path):
     #fig.show()
 
 # Multiple location info table
-def plot_pse_hfo_rate_auc_table(data_by_loc):
+def plot_pse_hfo_rate_auc_table(data_by_loc, saving_path):
     np.random.seed(1)
     col_colors = []
     rows = []
@@ -268,7 +268,7 @@ def plot_pse_hfo_rate_auc_table(data_by_loc):
     fig.update_layout(
         autosize=False,
         width=500,
-        height=500,
+        height=700,
         margin=dict(
             l=50,
             r=50,
@@ -276,7 +276,20 @@ def plot_pse_hfo_rate_auc_table(data_by_loc):
             t=100,
             pad=4
         ))
-    fig.show()
+    if Path(orca_executable).exists():
+        #print('Orca executable_path: {0}'.format(
+        #    plotly.io.orca.config.executable))
+        #plotly.io.orca.config.executable = orca_executable
+        #plotly.io.orca.config.save()
+        try:
+            fig.write_image(saving_path+'.png')
+        except ValueError:
+            print('Orca executable is probably invalid, save figure manually.')
+    else:
+        print('You need to install orca and define orca executable path in '
+              'order to plotly tables.')
+
+    #fig.show()
 
 
 
