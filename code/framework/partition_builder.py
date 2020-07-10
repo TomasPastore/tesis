@@ -225,16 +225,23 @@ def pull_apart_validation_set(patients_dic, hfo_type_name):
 
 
 # Features del modelo de ml segun el hfo_type
-def ml_field_names(hfo_type_name):
+def ml_field_names(hfo_type_name, include_coords=False):
     if hfo_type_name in ['RonO', 'Fast RonO']:
-        field_names = ['duration', 'freq_pk', 'power_pk',
+        field_names = ['duration',
+                       'power_pk', 'power_av',
+                       'freq_pk', 'freq_av',
                        'slow_angle',
                        'delta_angle',
                        'theta_angle',
-                       'spindle_angle', 'x', 'y', 'z']  # 'slow', 'delta','theta', 'spindle',
+                       'spindle_angle']  # 'slow', 'delta','theta', 'spindle',
     else:
-        field_names = ['x', 'y', 'z', 'duration', 'power_av', 'freq_av', 'spike_angle']  # ,' 'age', 'spike','spike_vs', 'freq_pk', 'power_pk'
-        #'duration', 'power_av', 'freq_av', 'spike_angle', 'x', 'y', 'z', 'freq_pk', 'power_pk'
+        field_names = ['duration',
+                       'power_pk', 'power_av',
+                       'freq_pk','freq_av',
+                       'spike_angle']
+    if include_coords:
+        for c in ['x', 'y', 'z']:
+            field_names.append(c)
 
     return field_names
 

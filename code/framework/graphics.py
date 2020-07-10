@@ -29,6 +29,7 @@ def encode_type_name(name):
 
 #TODO MOVE TO DB PARSING
 # Graphics for analysis
+'''
 def parse_elec_name(doc):
     if isinstance(doc['electrode'], list):
         e_name = doc['electrode'][0] if len(doc['electrode']) > 0 else None
@@ -37,7 +38,7 @@ def parse_elec_name(doc):
     else:
         raise RuntimeError('Unknown type for electrode name')
     return e_name
-
+'''
 
 # 3) Predicting SOZ with rate
 
@@ -118,6 +119,7 @@ def event_rate_by_loc(hfo_type_data_by_loc, zoomed_type=None, metrics=['pse', 'p
             print('ROC saving path: {0}'.format(saving_path_f))
         plt.savefig(saving_path_f, bbox_inches='tight')
     #plt.show()
+    plt.close(fig)
 
 # Plots the ROCs of many types in a location given in plot_data, modifies the axe object
 # It also may build tables of the global info in that location if you uncomment that piece of code
@@ -169,8 +171,8 @@ def superimposed_rocs(plot_data, title, axe, elec_count, colors=None,
 
     columns = [title] + [k for k in ['ec', 'pse', 'pnee', 'AUC_ROC'] if
                          k in plot_data[t]['scores'].keys()] #Title here is the location
-
-    plot_score_in_loc_table(columns, rows, colors, saving_path)
+    if saving_path is not None:
+        plot_score_in_loc_table(columns, rows, colors, saving_path)
 
     # method II: ggplot
     # df = pd.DataFrame(dict(fpr = fpr, tpr = tpr))
@@ -206,20 +208,8 @@ def plot_score_in_loc_table(columns, rows, colors, saving_path):
             t=100,
             pad=4
         ))
-
-    if Path(orca_executable).exists():
-        #print('Orca executable_path: {0}'.format(
-        #    plotly.io.orca.config.executable))
-        #plotly.io.orca.config.executable = orca_executable
-        #plotly.io.orca.config.save()
-        try:
-            fig.write_image(saving_path+'_in_loc_table.png')
-        except ValueError:
-            print('Orca executable is probably invalid, save figure manually.')
-    else:
-        print('You need to install orca and define orca executable path in '
-              'order to plotly tables.')
-
+    orca_save(fig, saving_path)
+    #plt.close(fig)
     #fig.show()
 
 # Multiple location info table
@@ -236,10 +226,15 @@ def plot_pse_hfo_rate_auc_table(data_by_loc, saving_path):
         sorted_types = sorted(HFO_TYPES)
         for type in sorted_types:
             row.append(round( data[type+'_AUC'], 2))
+        row.append(max(row[3:7])) # row = ['g','l','p','t1','t2','t3', 't4']
         rows.append(tuple(row))
 
     # Order by granularity, loc_name
-    rows = sorted(rows, key=lambda x: (x[0], x[1]))
+    #rows = sorted(rows, key=lambda x: (x[0], x[1]))
+
+    # Rank by AUC
+    rows = sorted(rows, key=lambda x: x[7])
+
     for row in rows:
         col_colors.append(color_by_gran(row[0]))
 
@@ -264,11 +259,10 @@ def plot_pse_hfo_rate_auc_table(data_by_loc, saving_path):
                 align='left', font=dict(color='black', size=8)
             ))
         ])
-
     fig.update_layout(
         autosize=False,
         width=500,
-        height=700,
+        height=1300,
         margin=dict(
             l=50,
             r=50,
@@ -276,112 +270,92 @@ def plot_pse_hfo_rate_auc_table(data_by_loc, saving_path):
             t=100,
             pad=4
         ))
-    if Path(orca_executable).exists():
-        #print('Orca executable_path: {0}'.format(
-        #    plotly.io.orca.config.executable))
-        #plotly.io.orca.config.executable = orca_executable
-        #plotly.io.orca.config.save()
-        try:
-            fig.write_image(saving_path+'.png')
-        except ValueError:
-            print('Orca executable is probably invalid, save figure manually.')
-    else:
-        print('You need to install orca and define orca executable path in '
-              'order to plotly tables.')
+    orca_save(fig, saving_path)
+    fig.show()
+    plt.close(fig)#dnt know if this works for plotly
 
-    #fig.show()
-
-
-
-#RELATION TODO WEDNESDAY
-def plot_co_metric_auc_0(m_tab, a_tab):
-    ms = []
-    aucs = []
-    for loc in m_tab.keys():
-        for t in HFO_TYPES:
-            ms.append(m_tab[loc][t])
-            aucs.append(a_tab[loc][t])
+# Plots scatter and fits line
+def plot_co_pse_auc(data_by_loc, saving_path):
+    pse = []
+    auc = []
+    locations = []
+    colors = []
+    labels = []
+    from db_parsing import get_granularity
     fig = plt.figure()
-    plt.scatter(ms, aucs)
+    defined_legends = set()
+    for loc in data_by_loc.keys():
+        for type in HFO_TYPES:
+            if type+'_AUC' in data_by_loc[loc].keys():
+                pse.append(data_by_loc[loc]['PSE'])
+                auc.append(data_by_loc[loc][type+'_AUC'])
+                locations.append(loc)
+                granularity = get_granularity(loc)
+                colors.append(color_for_scatter(granularity,type,
+                                                loc == 'Hippocampus'))
+                labels.append(type+'_in_loc'+str(granularity) if loc!=
+                                                              'Hippocampus' else
+                              'Hippocampus {'
+                                                               '0}'.format(
+                    type) )
+                if granularity == 2:
+                    marker = 'v'
+                elif granularity == 3:
+                    marker = '<'
+                elif granularity == 5:
+                    marker = '^'
+                else:
+                    raise ValueError('Granularity marker undefined')
+                label = None if labels[-1] in defined_legends else labels[-1]
+                defined_legends.add(label)
+                plt.scatter(pse[-1], auc[-1], c=colors[-1], label=label,
+                            marker=marker,
+                            )
     axes = plt.gca()
-    m, b = np.polyfit(ms, aucs, 1)
+    axes.legend(loc='lower right', prop={'size': 10})
+    m, b = np.polyfit(pse, auc, 1)
     X_plot = np.linspace(axes.get_xlim()[0], axes.get_xlim()[1], 100)
     plt.plot(X_plot, m * X_plot + b, '-')
-    plt.xlabel('Pathologic score')
+    plt.xlabel('Percentage of SOZ electrodes (PSE)')
     plt.ylabel('AUC ROC')
-    plt.title('Pathologic score and AUC ROC correlation')
-    plt.savefig("/home/tpastore/pscore_auc_correlation.png", bbox_inches='tight')
+    plt.title('Percentage of SOZ electrodes and HFO rate baseline relation')
+    plt.savefig(saving_path, bbox_inches='tight')
     plt.show()
+    plt.close(fig)
 
-def plot_co_metrics_auc(prop_tab, pewp_tab, auc_tab):
+def plot_feature_distribution(soz_data, nsoz_data, feature, type, stat, pval,
+                              saving_path):
+    saving_dir = str(Path(Path(saving_path).parent,
+                                     feature, type))
+    Path(saving_dir).mkdir(0o777, parents=True,
+                                        exist_ok=True)
+    fig_path = str(Path(saving_dir, str(Path(
+        saving_path).name)+'_feature_distr.pdf'))
+    print('Distribution saving path: {0}'.format(fig_path))
+    print('Plotting feature:{f} for type:{t}. Stat:{s} Pval:{p}'.format(
+        f=feature, t=type, s=stat, p=pval
+    ))
+    import seaborn as sns
+    sns.set_style("white")
+    # Plot
+    kwargs = dict(hist_kws={'alpha': .6}, kde_kws={'linewidth': 2})
 
-    grid = {}
-    for t in HFO_TYPES:
-        proportions = []
-        pewp = []
-        aucs = []
-        for loc in prop_tab.keys():
-            proportions.append(prop_tab[loc][t] if prop_tab[loc][t] < 1 else 0.99 )
-            pewp.append(pewp_tab[loc][t] if pewp_tab[loc][t] < 1 else 0.99)
-            aucs.append(auc_tab[loc][t] if auc_tab[loc][t] < 1 else 0.99)
-
-        min_prop, max_prop = min(proportions), max(proportions)
-
-        type_grid = {round(i,2) : {round(j,2):[] for j in np.arange(0, 0.5, 0.05)}
-                     for i in np.arange(0 ,0.6, 0.1)}
-        print('Init type gride {0}'.format(type_grid))
-        for i in range(len(proportions)):
-            p, pw, auc = proportions[i], pewp[i], aucs[i]
-            pw_box =  round(  ( (pw*100) - ((pw*100) % 5) ) /100, 2)
-            p_box = round( (p*100 - ((p*100) % 10)) / 100, 2)
-            type_grid[p_box][pw_box].append(auc)
-        print('GRID BEFORE AVERAGE')
-        print(type_grid)
-        for f, f_cols in type_grid.items():
-            for c, aucs in f_cols.items():
-                type_grid[f][c] = np.mean(aucs) if len(aucs)>0 else 0
-        print('GRID AFTER AVERAGE')
-        print(type_grid)
-        grid[t]= type_grid
-    heat_map = [[0 for i in range(10)] for j in range(6)]
-    for h in HFO_TYPES:
-        for f, fcols in grid[h].items():
-            for col, auc in fcols.items():
-                heat_map[int(f / 0.1)][int(col / 0.05)]= auc
-
-        fig = go.Figure(data=go.Heatmap(
-            z=heat_map))
-        fig.show()
-        '''
-        fig = plt.figure()
-        fig.suptitle('{0} pHFO and HFO rate AUC relation'.format(h))
-        axes = fig.gca()
-        axes.set_xlabel('PEWP (proportion of elec with pHFO)')
-        axes.set_ylabel('pHFO proportion')
-        axes.tick_params(grid_color='k', grid_alpha=0.5)
-        weights = []
-        x = []
-        y = []
-        for f, fcols in grid[h].items():
-            for col, auc in fcols.items():
-                x.append(col + 0.025)
-                y.append(f  + 0.05)
-                weights.append(auc)
-        pw_blocks = np.arange(0, 0.55, 0.05)
-        prop_blocks = np.arange(0, 1.1, 0.1)
-        hist, xedges, yedges, image = plt.hist2d(x, y, bins=[pw_blocks, prop_blocks], cmap=plt.cm.jet, label='Baseline HFO rate AUC-ROC')
-        print('hist, xedges, yedges')
-        print(hist)
-        print(xedges)
-        print(yedges)
-        axes.legend(loc='lower right', prop={'size': 7})
-        plt.colorbar()
-        plt.savefig("/home/tpastore/metrics_auc_correlation.png", bbox_inches='tight')
-        plt.show()
-        '''
-
-
-
+    fig = plt.figure(figsize=(10, 7), dpi=80)
+    fig.suptitle('{feat} SOZ vs NSOZ distributions'.format(feat=feature),
+                 fontsize=20)
+    plt.xlabel(feature, fontsize=18)
+    plt.ylabel('Frequency', fontsize=16)
+    sns.distplot(soz_data, color="red", label="SOZ", **kwargs)
+    sns.distplot(nsoz_data, color="green", label="NSOZ", **kwargs)
+    axes = fig.gca()
+    axes.text(0.03, 0.88, 'S: {0} \npVal: {1}'.format(stat, pval),
+              bbox=dict(facecolor='grey', alpha=0.5),
+             transform=axes.transAxes, fontsize=10)
+    #plt.xlim(50, 75)
+    plt.legend()
+    fig.savefig(fig_path)
+    plt.close(fig)
+    #plt.show()
 ##################     Plotting ML results ROCS and PRE_REC          #######################
 def axes_by_model(plt, models_to_run):
     subplot_count = len(models_to_run) * 2
@@ -546,9 +520,6 @@ def ml_training_plot(folds, loc, hfo_type_name, roc=True, pre_rec=True, models_t
     #plt.savefig('/home/{user}/{type}_phfo_model_comparison_{loc}.png'.format(user=getpass.getuser(), type=hfo_type_name,
     #                                                                         loc=loc), format='png')
     plt.show()
-
-
-
 
 def feature_importances(feature_list, importances, hfo_type_name):
     fig = plt.figure()
@@ -998,6 +969,24 @@ def table_color_for(t):
         return 'gold'
     raise ValueError('graphics.table_color_for is undefined for type: {0}'.format(t))
 
+def color_for_scatter(granularity, type, hip=False):
+    color_by_type = {
+        'RonS' : {2:'darkgreen', 3:'mediumseagreen', 5:'lime', 'Hippocampus':'black'},
+        'RonO' : {2:'midnightblue', 3:'mediumblue', 5:'cornflowerblue', 'Hippocampus':'dimgrey'},
+        'Fast RonO' : {2:'darkorange', 3:'orange', 5:'wheat',
+                       'Hippocampus':'darkgray'},
+        'Fast RonS' : {2:'darkred', 3:'red', 5:'lightcoral',
+                        'Hippocampus':'lightgray'}
+    }
+    try:
+        if hip:
+            return color_by_type[type]['Hippocampus']
+        else:
+            return color_by_type[type][3]
+    except Exception as e:
+        print('TYPE {0} GRANULARITY {1}'.format(type,granularity))
+        raise RuntimeError('Undefined color for granularity and type')
+
 def color_by_gran(granularity):
     if granularity == 0:
         return 'lightblue'
@@ -1009,3 +998,17 @@ def color_by_gran(granularity):
         return 'lightyellow'
     else:
         raise RuntimeError('Undefined color for granularity {0}'.format(granularity))
+
+def orca_save(fig, saving_path):
+    if Path(orca_executable).exists():
+        #print('Orca executable_path: {0}'.format(
+        #    plotly.io.orca.config.executable))
+        #plotly.io.orca.config.executable = orca_executable
+        #plotly.io.orca.config.save()
+        try:
+            fig.write_image(saving_path+'.pdf')
+        except ValueError:
+            print('Orca executable is probably invalid, save figure manually.')
+    else:
+        print('You need to install orca and define orca executable to save '
+              'this figure.')

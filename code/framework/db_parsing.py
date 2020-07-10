@@ -344,10 +344,8 @@ def parse_events(patients, event_collection, event_type_names, models_to_run,
             r_duration=float(evt['r_duration']),
             freq_av=float(evt['freq_av']),
             freq_pk=float(evt['freq_pk']),
-            power_av=mt.log10(float(evt['power_av'])) if float(
-                evt['power_av']) != 0 else 0.0,  # ASK not 0
-            power_pk=mt.log10(float(evt['power_pk'])) if float(
-                evt['power_pk']) != 0 else 0.0,
+            power_av=mt.log10(float(evt['power_av'])),
+            power_pk=mt.log10(float(evt['power_pk'])),
             loc1=loc1,  # electrode.
             loc2=loc2,
             loc3=loc3,
@@ -563,53 +561,7 @@ def parse_coord(param):  # -1 Represents empty, consider filtering
     return parsed_coord
 
 
-def ALL_loc_names(granularity):
-    if granularity == 2:
-        return ['Anterior Lobe', 'Frontal Lobe', 'Limbic Lobe', 'Occipital '
-                                                                'Lobe',
-                'Parietal Lobe', 'Posterior Lobe', 'Sub-lobar', 'Temporal Lobe',
-                'empty']
-    elif granularity == 3:
-        return ['*', 'Angular Gyrus', 'Anterior Cingulate', 'Caudate',
-                'Cerebellar Tonsil', 'Cingulate Gyrus', 'Claustrum', 'Culmen',
-                'Cuneus', 'Declive', 'Extra-Nuclear', 'Fusiform Gyrus',
-                'Inferior Frontal Gyrus', 'Inferior Occipital Gyrus',
-                'Inferior Parietal Lobule', 'Inferior Temporal Gyrus', 'Insula',
-                'Lentiform Nucleus', 'Lingual Gyrus', 'Medial Frontal Gyrus',
-                'Middle Frontal Gyrus', 'Middle Occipital Gyrus',
-                'Middle Temporal Gyrus', 'Orbital Gyrus', 'Paracentral Lobule',
-                'Parahippocampal Gyrus', 'Postcentral Gyrus',
-                'Posterior Cingulate', 'Precentral Gyrus', 'Precuneus',
-                'Pyramis', 'Sub-Gyral', 'Subcallosal Gyrus',
-                'Superior Frontal Gyrus', 'Superior Occipital Gyrus',
-                'Superior Parietal Lobule', 'Superior Temporal Gyrus',
-                'Supramarginal Gyrus', 'Thalamus', 'Transverse Temporal Gyrus',
-                'Tuber', 'Uncus', 'empty', []]
-
-
-    elif granularity == 5:
-        return ['*', 'Amygdala', 'Brodmann area 1', 'Brodmann area 10',
-                'Brodmann area 11', 'Brodmann area 13', 'Brodmann area 17',
-                'Brodmann area 18', 'Brodmann area 19', 'Brodmann area 2',
-                'Brodmann area 20', 'Brodmann area 21', 'Brodmann area 22',
-                'Brodmann area 23', 'Brodmann area 24', 'Brodmann area 25',
-                'Brodmann area 27', 'Brodmann area 28', 'Brodmann area 29',
-                'Brodmann area 3', 'Brodmann area 30', 'Brodmann area 31',
-                'Brodmann area 32', 'Brodmann area 33', 'Brodmann area 34',
-                'Brodmann area 35', 'Brodmann area 36', 'Brodmann area 37',
-                'Brodmann area 37 ', 'Brodmann area 38', 'Brodmann area 39',
-                'Brodmann area 4', 'Brodmann area 40', 'Brodmann area 41',
-                'Brodmann area 42', 'Brodmann area 44', 'Brodmann area 45',
-                'Brodmann area 46', 'Brodmann area 47', 'Brodmann area 5',
-                'Brodmann area 6', 'Brodmann area 7', 'Brodmann area 8',
-                'Brodmann area 9', 'Caudate Body', 'Caudate Head',
-                'Caudate Tail', 'Hippocampus', 'Lateral Globus Pallidus',
-                'Pulvinar', 'Putamen', 'empty', []]
-    else:
-        raise RuntimeError('Granularity not defined')
-
-
-def all_loc_names_test(granularity):
+def ALL_loc_names(granularity): #all to test
     if granularity == 2:
         return ['Frontal Lobe', 'Temporal Lobe', 'Parietal Lobe',
                 'Limbic Lobe', 'Occipital Lobe']
@@ -651,7 +603,7 @@ def all_loc_names_test(granularity):
                 'Caudate Tail', 'Hippocampus', 'Lateral Globus Pallidus',
                 'Pulvinar', 'Putamen']
     else:
-        raise RuntimeError('Granularity not defined')
+        return []
 
 
 # locations in MNI space loc1, loc2, loc3, loc4, loc5
@@ -684,8 +636,10 @@ def all_loc_names(granularity):
 
 
 def get_granularity(loc):
+    if loc == None:
+        return 0
     for i in range(6):
-        if loc in all_loc_names(i):
+        if loc in ALL_loc_names(i):
             return i
     raise RuntimeError('Unknown location name: {0}'.format(loc))
 
