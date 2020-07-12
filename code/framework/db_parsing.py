@@ -690,7 +690,7 @@ def parse_loc(doc, i):
     assert (isinstance(loc, str))  # 'empty ' represents location null
     return loc
 
-
+#Todo ver si puede ser none, compass sample dice q no, igual no molesta
 def parse_freq(info, freq_name, event):
     info[freq_name] = bool(event[freq_name])
     fq_vs_name = freq_name + '_vs'

@@ -323,8 +323,8 @@ def plot_co_pse_auc(data_by_loc, saving_path):
     plt.show()
     plt.close(fig)
 
-def plot_feature_distribution(soz_data, nsoz_data, feature, type, stat, pval,
-                              saving_path):
+def plot_feature_distribution(soz_data, nsoz_data, feature, type, stats,
+                              test_names, saving_path):
     saving_dir = str(Path(Path(saving_path).parent,
                                      feature, type))
     Path(saving_dir).mkdir(0o777, parents=True,
@@ -332,27 +332,38 @@ def plot_feature_distribution(soz_data, nsoz_data, feature, type, stat, pval,
     fig_path = str(Path(saving_dir, str(Path(
         saving_path).name)+'_feature_distr.pdf'))
     print('Distribution saving path: {0}'.format(fig_path))
-    print('Plotting feature:{f} for type:{t}. Stat:{s} Pval:{p}'.format(
-        f=feature, t=type, s=stat, p=pval
-    ))
+    print('Plotting feature:{f} for type:{t}'.format(
+        f=feature, t=type))
     import seaborn as sns
     sns.set_style("white")
     # Plot
     kwargs = dict(hist_kws={'alpha': .6}, kde_kws={'linewidth': 2})
 
     fig = plt.figure(figsize=(10, 7), dpi=80)
-    fig.suptitle('{feat} SOZ vs NSOZ distributions'.format(feat=feature),
+    fig.suptitle('{feat} SOZ vs NSOZ distributions'.format(
+        feat=feature.capitalize()),
                  fontsize=20)
-    plt.xlabel(feature, fontsize=18)
+    plt.xlabel(feature.capitalize(), fontsize=18)
     plt.ylabel('Frequency', fontsize=16)
     sns.distplot(soz_data, color="red", label="SOZ", **kwargs)
     sns.distplot(nsoz_data, color="green", label="NSOZ", **kwargs)
     axes = fig.gca()
-    axes.text(0.03, 0.88, 'S: {0} \npVal: {1}'.format(stat, pval),
-              bbox=dict(facecolor='grey', alpha=0.5),
-             transform=axes.transAxes, fontsize=10)
-    #plt.xlim(50, 75)
-    plt.legend()
+    X = {'D':0.05, 'W':0.35, 'U':0.65}
+    for S_name in test_names.keys():
+        S_val = round(stats[feature][type][test_names[S_name]][S_name], 4)
+        S_pval = format(stats[feature][type][test_names[S_name]]['pval'],'.2e')
+        # For text block coords (0, 0) is bottom and (1, 1) is top
+        axes.text(x=X[S_name],
+                  y=0.88,
+                  s='{t_name}\n{S_name}: {S_val} \npVal: {S_pval}'.format(
+                      t_name=test_names[S_name],
+                      S_name=S_name,
+                      S_val=S_val,
+                      S_pval=S_pval),
+                  bbox=dict(facecolor='grey', alpha=0.5),
+                  transform=axes.transAxes, fontsize=12)
+        #plt.xlim(50, 75)
+    plt.legend(loc='lower right')#'lower right'
     fig.savefig(fig_path)
     plt.close(fig)
     #plt.show()

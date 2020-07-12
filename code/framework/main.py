@@ -12,7 +12,7 @@ import numpy as np
 from matplotlib import \
     pyplot as plt  # todo ver donde se usa, deberia estar solo en graphics
 from sklearn.metrics import roc_auc_score, roc_curve
-from scipy.stats import wilcoxon, ranksums, kstest, ks_2samp
+from scipy.stats import ranksums, ks_2samp, mannwhitneyu
 import math as mt
 from datetime import timedelta
 from config import (EVENT_TYPES, HFO_TYPES, exp_save_path, TEST_BEFORE_RUN,
@@ -37,7 +37,6 @@ import graphics
 import math as mt
 
 
-
 def main():
     db = Database()
     elec_collection, evt_collection = db.get_collections()
@@ -48,7 +47,7 @@ def main():
         # TODO Agregar a informe, tests
         unittest.main(tests, exit=False)
 
-    run_experiment(elec_collection, evt_collection, number=4, roman_num='i',
+    run_experiment(elec_collection, evt_collection, number=4, roman_num='ii',
                    letter='a')
 
     # TODO week 26/7 dump to overleaf reeplazing commented structure to code structure with if
@@ -199,7 +198,7 @@ def run_experiment(elec_collection, evt_collection, number, roman_num,
                     evt_types_to_cmp=[[t] for
                                       t in
                                       HFO_TYPES],
-                    saving_path= saving_path)
+                    saving_path=saving_path)
                 feature_statistical_tests(patients_dic,
                                           types=['RonO', 'Fast RonO'],
                                           features=ml_field_names('RonO',
@@ -227,7 +226,7 @@ def run_experiment(elec_collection, evt_collection, number, roman_num,
                     evt_types_to_cmp=[[t] for
                                       t in
                                       HFO_TYPES],
-                    saving_path= saving_path)
+                    saving_path=saving_path)
                 feature_statistical_tests(patients_dic,
                                           types=['RonO', 'Fast RonO'],
                                           features=ml_field_names('RonO',
@@ -240,34 +239,35 @@ def run_experiment(elec_collection, evt_collection, number, roman_num,
                                                                   include_coords=True),
                                           saving_path=saving_path)
         elif roman_num == 'ii':
-            # Localized: Hsippocampus
-            saving_path =  exp_save_path[4]['ii']['Hippocampus']
-            patients_dic, \
-            baselines_data = evt_rate_soz_pred_baseline_whole_brain(
-                elec_collection,
-                evt_collection,
-                intraop=False,
-                load_untagged_coords_from_db=True,
-                load_untagged_loc_from_db=True,
-                restrict_to_tagged_coords=True,
-                restrict_to_tagged_locs=True,
-                evt_types_to_load=HFO_TYPES,
-                evt_types_to_cmp=[[t] for
-                                  t in
-                                  HFO_TYPES],
-                saving_path=saving_path)
-            feature_statistical_tests(patients_dic,
-                                      location='Hippocampus',
-                                      types=['RonO', 'Fast RonO'],
-                                      features=ml_field_names('RonO',
-                                                              include_coords=True),
-                                      saving_path=saving_path)
-            feature_statistical_tests(patients_dic,
-                                      location='Hippocampus',
-                                      types=['RonS', 'Fast RonS'],
-                                      features=ml_field_names('RonS',
-                                                              include_coords=True),
-                                      saving_path=saving_path)
+            if letter == 'a':
+                # Localized: Hippocampus
+                saving_path = exp_save_path[4]['ii']['Hippocampus']
+                patients_dic, \
+                baselines_data = evt_rate_soz_pred_baseline_whole_brain(
+                    elec_collection,
+                    evt_collection,
+                    intraop=False,
+                    load_untagged_coords_from_db=True,
+                    load_untagged_loc_from_db=True,
+                    restrict_to_tagged_coords=True,
+                    restrict_to_tagged_locs=True,
+                    evt_types_to_load=HFO_TYPES,
+                    evt_types_to_cmp=[[t] for
+                                      t in
+                                      HFO_TYPES],
+                    saving_path=saving_path)
+                feature_statistical_tests(patients_dic,
+                                          location='Hippocampus',
+                                          types=['RonO', 'Fast RonO'],
+                                          features=ml_field_names('RonO',
+                                                                  include_coords=True),
+                                          saving_path=saving_path)
+                feature_statistical_tests(patients_dic,
+                                          location='Hippocampus',
+                                          types=['RonS', 'Fast RonS'],
+                                          features=ml_field_names('RonS',
+                                                                  include_coords=True),
+                                          saving_path=saving_path)
         # Usar sklearn pipeline
         # Resultados: xgboost, model_patients (%75), random partition, robust scaler, balanced, filter 0.7 da 0.8 de AP
         # whole_brain_hfo_classifier(elec_collection, evt_collection) # TODO with allowed and not allowed coords
@@ -686,7 +686,7 @@ def evt_rate_soz_pred_baseline_localized(elec_collection,
     return data_by_loc
 
 
-# 5) ML HFO classifiers
+# 4) ML HFO classifiers
 # Compare modelos con y sin balanceo, el scaler, la forma de hacer la particion de pacientes y param tuning
 # Model patients da peor
 
@@ -710,8 +710,8 @@ def feature_statistical_tests(patients_dic,
 
         for t in types:
             if 'angle' in feature:
-                feature_data['sin_'+feature][t] = {'soz': [], 'nsoz': []}
-                feature_data['cos_'+feature][t] = {'soz': [], 'nsoz': []}
+                feature_data['sin_' + feature][t] = {'soz': [], 'nsoz': []}
+                feature_data['cos_' + feature][t] = {'soz': [], 'nsoz': []}
             else:
                 feature_data[feature][t] = {'soz': [], 'nsoz': []}
 
@@ -722,20 +722,20 @@ def feature_statistical_tests(patients_dic,
             electrodes = p.electrodes
         else:
             electrodes = [e for e in p.electrodes if
-                          getattr(e, 'loc{g}'.format(g=
+                          location == getattr(e, 'loc{g}'.format(g=
                           get_granularity(
                               location)))]
         for e in electrodes:
+            soz_label = 'soz' if e.soz else 'nsoz'
             for t in types:
                 for h in e.events[t]:
                     for f in features:
-                        soz_label = 'soz' if h.info['soz'] else 'nsoz'
                         if 'angle' in f:
-                            if h.info[f] == True:
-                                feature_data['sin_{f}'.format(f=f)][
-                                    t][soz_label].append(mt.sin(h.info[f]))
+                            if h.info[f[:-len('_angle')]] == True:
+                                feature_data['sin_{f}'.format(f=f)][t][
+                                    soz_label].append(mt.sin(h.info[f]))
                                 feature_data['cos_{f}'.format(f=f)][
-                                    t][soz_label].append(mt.cos(h.info[f]))
+                                t][soz_label].append(mt.cos(h.info[f]))
                         else:
                             feature_data[f][t][soz_label].append(h.info[f])
 
@@ -747,55 +747,46 @@ def feature_statistical_tests(patients_dic,
             f_names = [f]
         for t in types:
             for feat_name in f_names:
-                print('Feature name ', feat_name)
-                print('Type ', t)
-
                 if min(len(feature_data[feat_name][t]['soz']),
                        len(feature_data[feat_name][t]['nsoz'])) == 0:
                     print('There is no info for {f} with type {'
-                      't}'.format(f=feat_name, t=t))
+                          't}'.format(f=feat_name, t=t))
                 else:
                     stats[feat_name][t] = dict()
-                    stats[feat_name][t]['stat'], stats[feat_name][t]['pval'] \
-                        = \
-                        ks_2samp(feature_data[
-                                     feat_name][
-                                     t]['soz'],
-                                 feature_data[feat_name][
-                                     t][
-                                     'nsoz']
-                                 )
-                    graphics.plot_feature_distribution(feature_data[feat_name][t][
-                                                'soz'],
-                                      feature_data[feat_name][t]['nsoz'],
-                                      feature=feat_name,
-                                      type=t,
-                                      stat=stats[feat_name][t]['stat'],
-                                      pval=format(stats[feat_name][t]['pval'], '.2e'),
-                                      saving_path=saving_path)
+                    data_soz = feature_data[feat_name][t]['soz']
+                    data_nsoz = feature_data[feat_name][t]['nsoz']
+                    test_names = {'D': 'Kolmogorov-Smirnov test',
+                                  'W': 'Wilcoxon signed-rank test',
+                                  'U': 'Mann-Whitney U test'}
+                    test_func = {'D': ks_2samp,
+                                  'W': ranksums,
+                                  'U': mannwhitneyu}
+                    for s_name, test_f in test_func.items():
+                        stats[feat_name][t][test_names[s_name]] = dict()
+                        stats[feat_name][t][test_names[s_name]][s_name], \
+                        stats[feat_name][t][test_names[s_name]]['pval']= \
+                            test_f(data_soz, data_nsoz)
+                    graphics.plot_feature_distribution(data_soz,
+                                                       data_nsoz,
+                                                       feature=feat_name,
+                                                       type=t,
+                                                       stats=stats,
+                                                       test_names=test_names,
+                                                       saving_path=saving_path)
+
 
 # default ml algorithms comparisons in region
 def ml_phfo_models(elec_collection, evt_collection, rm_null_coords, location,
                    models_to_run=models_to_run, comp_with='',
                    conf=None):
-    intraop = False
     event_type_data_by_loc = {loc_name: {}}
     loc, locations = get_locations(5, [loc_name])
     target = [
         'model_pat']  # this should be a parameter it can be ['model_pat'], ['validation_pat'],['model_pat', 'validation_pat']
-    elec_filter, evt_filter = query_filters(intraop, [hfo_type_name], loc,
-                                            loc_name)
-    elec_cursor = elec_collection.find(elec_filter,
-                                       projection=electrodes_query_fields)
-    hfo_cursor = evt_collection.find(evt_filter,
-                                     projection=hfo_query_fields)
-    patients_dic = parse_patients(elec_cursor, hfo_cursor, models_to_run)
-    print('Total patients {0}'.format(len(patients_dic)))
 
     target_patients = phfo_predictor(loc_name, hfo_type_name, patients_dic,
                                      target=target, models=models_to_run,
                                      conf=conf)
-
     all_target = 'model_pat' in target and 'validation_pat' in target
     if all_target:
         name = ' baseline all'
