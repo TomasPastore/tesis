@@ -1,6 +1,8 @@
 import math as mt
 
-from classes import Patient, Electrode, Event
+from patient import Patient
+from electrode import Electrode
+from event import Event
 from config import EVENT_TYPES, non_intraop_patients, intraop_patients, \
     electrodes_query_fields, \
     hfo_query_fields
@@ -80,14 +82,19 @@ def query_filters(intraop, event_type_names, loc, loc_name, hfo_subtypes=None,
     encoded_intraop = str(int(intraop))  # int(True) == 1
 
     elec_filter = {
-        'patient_id': patient_id_intraop_cond}  # 'x' : {'$ne':'-1'}, 'y' : {'$ne':'-1'}, 'z' : {'$ne':'-1'}
+        'patient_id': patient_id_intraop_cond,
+    }
     evt_filter = {'patient_id': patient_id_intraop_cond,
                   'intraop': encoded_intraop,
                   # probably this intraop is actually not needed but doesnt harm anyway
                   'type': {'$in': [encode_type_name(e) for e in
-                                   event_type_names]},  # order doesnt matter
-                  }  # '$or': [{'type':'1'}, {'type':'2'}, {'type':'4'}, {'type':'5'} ]
-
+                                   event_type_names],
+                          },  # order doesnt matter
+                  'freq_av': {'$ne': 0},
+                  'freq_pk': {'$ne': 0},
+                  'power_av': {'$ne': 0},
+                  'power_pk': {'$ne': 0}
+                  }
     if hfo_subtypes is not None:  # This says that it belongs to a subtype of a type in evt filter or the event is a Spike that doesnt have subtypes
         evt_filter['$or'] = [
             {'$or': [{subtype: 1} for subtype in hfo_subtypes]},
@@ -125,6 +132,7 @@ def parse_patients(electrodes_cursor, hfo_cursor, event_type_names,
     print('Parsing db patients...')
     patients_dic = dict()
     parse_electrodes(patients_dic, electrodes_cursor, event_type_names)
+    assert(hfo_cursor.count() > 0)
     parse_events(patients_dic, hfo_cursor, event_type_names, models_to_run,
                  remove_xyz_null=rm_xyz_null,
                  remove_loc_empty=rm_loc_empty)
@@ -137,8 +145,8 @@ def parse_electrodes(patients, elec_cursor, event_type_names):
     for e in elec_cursor:
         # Patient level
         patient_id = e['patient_id']
-        if not patient_id in patients.keys():
-            patient = Patient(id=patient_id, age=parse_age(e))
+        if patient_id not in patients.keys():
+            patient = Patient(id=patient_id, age=parse_age(e), electrodes=[])
             patients[patient_id] = patient
         else:
             patient = patients[patient_id]
@@ -154,12 +162,12 @@ def parse_electrodes(patients, elec_cursor, event_type_names):
         e_name = parse_elec_name(e)
         file_block = int(e['file_block'])
         x, y, z = parse_coord(e['x']), parse_coord(e['y']), parse_coord(e['z'])
-        loc1, loc2, loc3, loc4, loc5 = parse_loc(e, 1), parse_loc(e,
-                                                                  2), parse_loc(
-            e, 3), parse_loc(e, 4), parse_loc(e,
-                                              5)
+        loc1, loc2, loc3, loc4, loc5 = parse_loc(e, 1), parse_loc(e,2), \
+                                       parse_loc(e, 3), parse_loc(e, 4), \
+                                       parse_loc(e, 5)
 
-        if e_name not in patient.electrode_names():  # First time I see this electrode for
+        first_time_seen = e_name not in patient.electrode_names()
+        if first_time_seen:
             electrode = Electrode(name=e_name, soz=parse_soz(e['soz']),
                                   blocks={file_block: None}, x=x, y=y, z=z,
                                   soz_sc=(e['soz_sc']),
@@ -168,9 +176,9 @@ def parse_electrodes(patients, elec_cursor, event_type_names):
                                   event_type_names=event_type_names)
             patient.add_electrode(electrode)
         else:  # The electrode exists probably because there are many blocks for the electrodes
-            electrode = next(e2 for e2 in patient.electrodes if
-                             e2.name == e_name)  # look up the electrode by name
+            electrode = patient.get_electrode(e_name)
             # Check consistency
+            assert(electrode.name == e_name and patient.id== e['patient_id'])
 
             if parse_soz(e['soz']) != electrode.soz:
                 log(msg=('Warning, soz disagreement among blocks of '
@@ -232,7 +240,8 @@ def parse_events(patients, event_collection, event_type_names, models_to_run,
         if patient_id not in patients.keys():
             # raise RuntimeWarning('The parse_electrodes may should have had the patient created first')
             patient = Patient(id=patient_id, age=parse_age(
-                evt))  # optionally you could create it in this moment
+                evt), electrodes=[])  # optionally you could create it in this
+            # moment
             patients[patient.id] = patient
         else:
             patient = patients[patient_id]
@@ -271,8 +280,7 @@ def parse_events(patients, event_collection, event_type_names, models_to_run,
                                   event_type_names=event_type_names)
             patient.add_electrode(electrode)
         else:
-            electrode = next(e for e in patient.electrodes if e.name == e_name)
-
+            electrode = patient.get_electrode(e_name)
             # Check consistency
 
             # SOZ
@@ -320,6 +328,8 @@ def parse_events(patients, event_collection, event_type_names, models_to_run,
 
         # Elec count update
         evt_type = decode_type_name(evt['type'])
+        if evt_type == 'Spikes':
+            print(evt)
         if file_block not in electrode.evt_count[evt_type].keys():
             electrode.evt_count[evt_type][file_block] = 1
         else:
@@ -562,6 +572,8 @@ def parse_coord(param):  # -1 Represents empty, consider filtering
 
 
 def ALL_loc_names(granularity): #all to test
+    if granularity == 0:
+        return ['Whole Brain']
     if granularity == 2:
         return ['Frontal Lobe', 'Temporal Lobe', 'Parietal Lobe',
                 'Limbic Lobe', 'Occipital Lobe']
@@ -609,7 +621,7 @@ def ALL_loc_names(granularity): #all to test
 # locations in MNI space loc1, loc2, loc3, loc4, loc5
 def all_loc_names(granularity):
     if granularity == 0:
-        return ['Whole brain']
+        return ['Whole Brain']
     elif granularity == 1:
         return ['Right Cerebrum', 'Left Cerebrum']
     elif granularity == 2:
@@ -636,7 +648,7 @@ def all_loc_names(granularity):
 
 
 def get_granularity(loc):
-    if loc == None:
+    if loc == None or loc == 'Whole Brain':
         return 0
     for i in range(6):
         if loc in ALL_loc_names(i):

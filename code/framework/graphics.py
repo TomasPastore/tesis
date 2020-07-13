@@ -27,18 +27,124 @@ import matplotlib.style as mplstyle
 def encode_type_name(name):
     return str(EVENT_TYPES.index(name) + 1)
 
-#TODO MOVE TO DB PARSING
-# Graphics for analysis
-'''
-def parse_elec_name(doc):
-    if isinstance(doc['electrode'], list):
-        e_name = doc['electrode'][0] if len(doc['electrode']) > 0 else None
-    elif isinstance(doc['electrode'], str):
-        e_name = doc['electrode'] if len(doc['electrode']) > 0 else None
-    else:
-        raise RuntimeError('Unknown type for electrode name')
-    return e_name
-'''
+
+# 1) Global info by location table
+def plot_global_info_by_loc_table(data_by_loc, saving_path):
+    np.random.seed(1)
+    sorted_types = sorted(EVENT_TYPES)
+    col_colors = []
+    rows = []
+    for loc, data in data_by_loc.items():
+        row = []
+        granularity = get_granularity(loc)
+        row.append(granularity)
+        row.append(loc)
+        row.append(data['patient_count'])
+        row.append(data['patients_with_epilepsy'])
+        row.append(data['elec_count'])
+        row.append(data['soz_elec_count'])
+        row.append(data['PSE'])
+        for type in sorted_types:
+            row.append(data[type+'_N'])
+        rows.append(tuple(row))
+
+    # Order by granularity, loc_name
+    rows = sorted(rows, key=lambda x: (x[0], x[1]))
+
+    for row in rows:
+        col_colors.append(color_by_gran(row[0]))
+
+    fig = go.Figure(
+        data=[go.Table(
+            columnwidth=[300, 500, 200, 200, 200, 200, 200, 200, 200, 200,
+                         200, 200, 200],
+            header=dict(
+                values=['{b}Granularity{b}'.format(b='<b>'),
+                        '{b}Location{b}'.format(b='<b>'),
+                        '{b}# Patients{b}'.format(b='<b>'),
+                        '{b}# SOZ Patients{b}'.format(b='<b>'),
+                        '{b}# Elec{b}'.format(b='<b>'),
+                        '{b}# SOZ Elec{b}'.format(b='<b>'),
+                        '{b}PSE{b}'.format(b='<b>'),
+                        '{b}# {t}{b}'.format(b='<b>', t=sorted_types[0]),
+                        '{b}# {t}{b}'.format(b='<b>', t=sorted_types[1]),
+                        '{b}# {t}{b}'.format(b='<b>', t=sorted_types[2]),
+                        '{b}# {t}{b}'.format(b='<b>', t=sorted_types[3]),
+                        '{b}# {t}{b}'.format(b='<b>', t=sorted_types[4]),
+                        '{b}# {t}{b}'.format(b='<b>', t=sorted_types[5]),
+                        ],
+                line_color='black', fill_color='white',
+                align='left', font=dict(color='black', size=10)
+            ),
+            cells=dict(
+                values=[[r[i] for r in rows] for i in range(13)],
+                fill_color=[np.array(col_colors) for i in range(13)],
+                align='left', font=dict(color='black', size=8)
+            ))
+        ])
+    '''
+    fig.update_layout(
+        autosize=False,
+        width=3000,
+        height=1300,
+        margin=dict(
+            l=50,
+            r=50,
+            b=100,
+            t=100,
+            pad=4
+        ))
+    '''
+    orca_save(fig, saving_path)
+    fig.show()
+
+
+# 2) HFO rate comparison and features comparison in 4)
+def plot_feature_distribution(soz_data, nsoz_data, feature, type, stats,
+                              test_names, saving_path):
+    saving_dir = str(Path(Path(saving_path).parent,
+                                     feature, type))
+    Path(saving_dir).mkdir(0o777, parents=True,
+                                        exist_ok=True)
+    fig_path = str(Path(saving_dir, str(Path(
+        saving_path).name)+'_feature_distr.pdf'))
+    print('Distribution saving path: {0}'.format(fig_path))
+    print('Plotting feature:{f} for type:{t}'.format(
+        f=feature, t=type))
+    import seaborn as sns
+    sns.set_style("white")
+    # Plot
+    kwargs = dict(hist_kws={'alpha': .6}, kde_kws={'linewidth': 2})
+
+    fig = plt.figure(figsize=(10, 7), dpi=80)
+    fig.suptitle('{feat} SOZ vs NSOZ distributions'.format(
+        feat=feature.capitalize()),
+                 fontsize=20)
+    plt.xlabel(feature.capitalize(), fontsize=18)
+    plt.ylabel('Frequency', fontsize=16)
+    sns.distplot(soz_data, color="red", label="SOZ", **kwargs)
+    sns.distplot(nsoz_data, color="green", label="NSOZ", **kwargs)
+    axes = fig.gca()
+    X = {'D':0.05, 'W':0.35, 'U':0.65}
+    for S_name in test_names.keys():
+        S_val = round(stats[feature][type][test_names[S_name]][S_name], 4)
+        S_pval = format(stats[feature][type][test_names[S_name]]['pval'],'.2e')
+        # For text block coords (0, 0) is bottom and (1, 1) is top
+        axes.text(x=X[S_name],
+                  y=0.88,
+                  s='{t_name}\n{S_name}: {S_val} \npVal: {S_pval}'.format(
+                      t_name=test_names[S_name],
+                      S_name=S_name,
+                      S_val=S_val,
+                      S_pval=S_pval),
+                  bbox=dict(facecolor='grey', alpha=0.5),
+                  transform=axes.transAxes, fontsize=12)
+        #plt.xlim(50, 75)
+    plt.legend(loc='lower right')#'lower right'
+    fig.savefig(fig_path)
+    plt.close(fig)
+    #plt.show()
+
 
 # 3) Predicting SOZ with rate
 
@@ -272,7 +378,6 @@ def plot_pse_hfo_rate_auc_table(data_by_loc, saving_path):
         ))
     orca_save(fig, saving_path)
     fig.show()
-    plt.close(fig)#dnt know if this works for plotly
 
 # Plots scatter and fits line
 def plot_co_pse_auc(data_by_loc, saving_path):
@@ -295,8 +400,7 @@ def plot_co_pse_auc(data_by_loc, saving_path):
                                                 loc == 'Hippocampus'))
                 labels.append(type+'_in_loc'+str(granularity) if loc!=
                                                               'Hippocampus' else
-                              'Hippocampus {'
-                                                               '0}'.format(
+                              'Hippocampus {0}'.format(
                     type) )
                 if granularity == 2:
                     marker = 'v'
@@ -323,50 +427,6 @@ def plot_co_pse_auc(data_by_loc, saving_path):
     plt.show()
     plt.close(fig)
 
-def plot_feature_distribution(soz_data, nsoz_data, feature, type, stats,
-                              test_names, saving_path):
-    saving_dir = str(Path(Path(saving_path).parent,
-                                     feature, type))
-    Path(saving_dir).mkdir(0o777, parents=True,
-                                        exist_ok=True)
-    fig_path = str(Path(saving_dir, str(Path(
-        saving_path).name)+'_feature_distr.pdf'))
-    print('Distribution saving path: {0}'.format(fig_path))
-    print('Plotting feature:{f} for type:{t}'.format(
-        f=feature, t=type))
-    import seaborn as sns
-    sns.set_style("white")
-    # Plot
-    kwargs = dict(hist_kws={'alpha': .6}, kde_kws={'linewidth': 2})
-
-    fig = plt.figure(figsize=(10, 7), dpi=80)
-    fig.suptitle('{feat} SOZ vs NSOZ distributions'.format(
-        feat=feature.capitalize()),
-                 fontsize=20)
-    plt.xlabel(feature.capitalize(), fontsize=18)
-    plt.ylabel('Frequency', fontsize=16)
-    sns.distplot(soz_data, color="red", label="SOZ", **kwargs)
-    sns.distplot(nsoz_data, color="green", label="NSOZ", **kwargs)
-    axes = fig.gca()
-    X = {'D':0.05, 'W':0.35, 'U':0.65}
-    for S_name in test_names.keys():
-        S_val = round(stats[feature][type][test_names[S_name]][S_name], 4)
-        S_pval = format(stats[feature][type][test_names[S_name]]['pval'],'.2e')
-        # For text block coords (0, 0) is bottom and (1, 1) is top
-        axes.text(x=X[S_name],
-                  y=0.88,
-                  s='{t_name}\n{S_name}: {S_val} \npVal: {S_pval}'.format(
-                      t_name=test_names[S_name],
-                      S_name=S_name,
-                      S_val=S_val,
-                      S_pval=S_pval),
-                  bbox=dict(facecolor='grey', alpha=0.5),
-                  transform=axes.transAxes, fontsize=12)
-        #plt.xlim(50, 75)
-    plt.legend(loc='lower right')#'lower right'
-    fig.savefig(fig_path)
-    plt.close(fig)
-    #plt.show()
 ##################     Plotting ML results ROCS and PRE_REC          #######################
 def axes_by_model(plt, models_to_run):
     subplot_count = len(models_to_run) * 2
@@ -1018,6 +1078,7 @@ def orca_save(fig, saving_path):
         #plotly.io.orca.config.save()
         try:
             fig.write_image(saving_path+'.pdf')
+            fig.write_html(saving_path+'.html')
         except ValueError:
             print('Orca executable is probably invalid, save figure manually.')
     else:

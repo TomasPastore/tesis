@@ -103,13 +103,14 @@ experiment_default_path = str(Path(EXPERIMENTS_FOLDER, 'exp'))
 
 exp_save_path = dict()  # 7 'Experiments'
 
-exp_save_path[1] = str(Path(EXPERIMENTS_FOLDER, '1_global_data/global_data'))
+exp_save_path[1] = str(Path(EXPERIMENTS_FOLDER, '1_global_data'))
+
 exp_save_path[2] = dict()
 exp_save_path[2]['dir'] = str(Path(EXPERIMENTS_FOLDER, '2_rate_soz_vs_nsoz'))
 exp_save_path[2]['i'] = str(
-    Path(exp_save_path[2]['dir'], 'i_whole_brain/whole_brain'))
+    Path(exp_save_path[2]['dir'], '2_i_whole_brain')) #dir
 exp_save_path[2]['ii'] = str(Path(exp_save_path[2]['dir'],
-                                  'ii_whole_brain/localized'))
+                                  '2_ii_localized'))  #dir
 
 exp_save_path[3] = dict()
 exp_save_path[3]['dir'] = str(
@@ -136,8 +137,7 @@ exp_save_path[4]['dir'] = str(Path(EXPERIMENTS_FOLDER, '4_ml_hfo_classifiers'))
 
 exp_save_path[4]['i'] = dict()
 exp_save_path[4]['i']['a'] = str(Path(exp_save_path[4]['dir'],
-                                      '4_i_whole_brain/4_i_a_coords_untag'))
-# dir
+                                      '4_i_whole_brain/4_i_a_coords_untag')) #dir
 exp_save_path[4]['i']['b'] = str(Path(exp_save_path[4]['dir'],
                                       '4_i_whole_brain/4_i_b_coords_tag'))  # dir
 exp_save_path[4]['ii'] = dict()

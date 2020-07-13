@@ -8,7 +8,7 @@ import graphics
 from config import (EVENT_TYPES, HFO_TYPES,
                     intraop_patients, non_intraop_patients, electrodes_query_fields, hfo_query_fields, models_to_run)
 from db_parsing import Database, parse_patients, get_locations, encode_type_name
-from main import query_filters, run_experiment
+from driver import Driver
 
 
 class hfoDBTest(unittest.TestCase):
@@ -72,14 +72,13 @@ class hfoDBTest(unittest.TestCase):
 
     def test_experiments_are_implemented(self):
         #TODO complete experiments
+        exp_driver = Driver(self.electrodes_collection, self.hfo_collection)
         for number, roman_num, letter in [('1', None, None),
                                              ('2','i', None),
                                              ('2', 'ii', None)
                                         ]:
             try:
-                run_experiment(self.electrodes_collection, self.hfo_collection,
-                               number,
-                               roman_num, letter)
+                exp_driver.run_experiment( number, roman_num, letter)
             except NotImplementedError as e:
                 raise e
 if __name__ == "__main__":

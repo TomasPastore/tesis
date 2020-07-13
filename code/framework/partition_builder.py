@@ -245,7 +245,7 @@ def ml_field_names(hfo_type_name, include_coords=False):
 
     return field_names
 
-
+#probar la varianza o mean del feature en el electrodo como nuevo feature
 def get_features_and_labels(patients, hfo_type_name, field_names):
     features = []
     labels = []

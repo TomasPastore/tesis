@@ -28,6 +28,73 @@ from sklearn.model_selection import GridSearchCV
 from random import random
 
 
+def ml_hfo_classifier(patients_dic, location, hfo_type,
+                      use_coords, sim_recall, saving_path=None):
+    print('ML CLASSIFIER location: {l} and type: {t}'.format(l=location,
+                                                             t=hfo_type))
+
+    event_type_data_by_loc = {loc_name: {}}
+    loc, locations = get_locations(5, [loc_name])
+    target = [
+        'model_pat']  # this should be a parameter it can be ['model_pat'], ['validation_pat'],['model_pat', 'validation_pat']
+
+    target_patients = phfo_predictor(loc_name, hfo_type_name, patients_dic,
+                                     target=target, models=models_to_run,
+                                     conf=sim_recall)
+    if 'model_pat' in target and 'validation_pat' in target:
+        name = ' baseline all'
+    else:
+        name = ' baseline {0}'.format(target[0])
+
+    event_type_data_by_loc[loc_name][hfo_type_name + name] = region_info(
+        {p.id: p for p in target_patients}, [hfo_type_name])
+
+    for model_name in models_to_run:
+        simulating = sim_recall is not None
+        if simulating and model_name != 'Simulated':  # this is cause we need to run at least one other model to simulate, but then we just plot the simulated
+            continue  # Esto ejecuta solo el simulador, esta bien, no los uso juntos
+
+        print('Running model {0}'.format(model_name))
+        labels, preds, probs = gather_folds(model_name, hfo_type_name,
+                                            target_patients=target_patients)
+        print('Displaying metrics for phfo classifier')
+        print_metrics(model_name, hfo_type_name, labels, preds, probs)
+
+        # SOZ HFO RATE MODEL
+        fpr, tpr, thresholds = roc_curve(labels, probs)
+        for tol_fpr in tol_fprs:
+            thresh = get_soz_confidence_thresh(fpr, thresholds,
+                                               tolerated_fpr=tol_fpr)  #
+            filtered_pat_dic = phfo_thresh_filter(target_patients,
+                                                  hfo_type_name,
+                                                  thresh=thresh,
+                                                  perfect=False,
+                                                  model_name=model_name)
+            confidence = None if model_name != 'Simulated' else sim_recall
+            print(
+                'For model_name {0} conf is {1}'.format(model_name,
+                                                        confidence))
+            rated_data = region_info(filtered_pat_dic, [hfo_type_name],
+                                     flush=True,
+                                     conf=confidence)  # calcula la info para la roc con la prob asociada al fpr tolerado
+            event_type_data_by_loc[loc_name][
+                hfo_type_name + ' hfo rate ' + model_name + ' FPR {0}'.format(
+                    tol_fpr)] = rated_data
+
+    graphics.event_rate_by_loc(event_type_data_by_loc,
+                               metrics=['ec', 'auc'],
+                               title='Hippocampal RonS HFO rate (events per minute) baseline \nVS {0}filtered rate.'.format(
+                                   comp_with),
+                               colors='random' if comp_with == '' else None,
+                               conf=sim_recall)
+
+def compare_Hippocampal_RonS_ml_models(elec_collection, evt_collection):
+    models_to_run = ['XGBoost', 'Random Forest', 'Bayes']
+    ml_phfo_models(elec_collection, evt_collection, 'Hippocampus', 'RonS',
+                   tol_fprs=[0.6], models_to_run=models_to_run)
+
+
+
 def predict_folds(folds, target_patients, hfo_type_name, models, conf=0.7):
     for model_name in models:
         print('Predicting folds for model {0}'.format(model_name))
