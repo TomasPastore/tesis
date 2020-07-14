@@ -43,7 +43,7 @@ def main():
 
     exp_driver = Driver(elec_collection, evt_collection)
     # Experiment list for the driver:
-    exp_driver.run_experiment( number=1, roman_num='ii', letter='a')
+    exp_driver.run_experiment( number=3, roman_num='0', letter='a')
 
 
 if __name__ == "__main__":

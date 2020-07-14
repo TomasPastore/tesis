@@ -82,19 +82,17 @@ def plot_global_info_by_loc_table(data_by_loc, saving_path):
                 align='left', font=dict(color='black', size=8)
             ))
         ])
-    '''
     fig.update_layout(
         autosize=False,
-        width=3000,
-        height=1300,
+        width=1300,
+        height=1250,
         margin=dict(
-            l=50,
-            r=50,
-            b=100,
-            t=100,
-            pad=4
+            l=30,
+            r=30,
+            b=50,
+            t=50,
+            pad=3
         ))
-    '''
     orca_save(fig, saving_path)
     fig.show()
 

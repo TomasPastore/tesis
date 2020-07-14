@@ -17,22 +17,14 @@ import math as mt
 
 # 2) HFO rate in SOZ vs NSOZ  ##################################################################
 # Note: HFO rate is defined in patient.py module as a method for the electrode object
-def hfo_rate_statistical_tests(patients_dic, types=HFO_TYPES,
+def hfo_rate_statistical_tests(rates_by_type, types=HFO_TYPES,
                                saving_path=exp_save_path[2]['dir']):
-    # Getting HFO rate for SOZ and NSOZ for each type
-    data_by_type = {type:{'soz': [], 'nsoz': []} for type in types}
-    for p in patients_dic.values():
-        for e in p.electrodes:
-            soz_label = 'soz' if e.soz else 'nsoz'
-            for t in types:
-                data_by_type[t][soz_label].append(e.get_events_rate([t]))
-
     # Calculating Stat and pvalue and plotting
     stats = dict( HFO_rate={type: dict() for type in types})
     feat_name = 'HFO_rate'
     for t in types:
-        data_soz = data_by_type[t]['soz']
-        data_nsoz = data_by_type[t]['nsoz']
+        data_soz = rates_by_type[t]['soz']
+        data_nsoz = rates_by_type[t]['nsoz']
         if min(len(data_soz), len(data_nsoz) )== 0:
             print('There is no info for type {t}'.format( t=t))
         else:

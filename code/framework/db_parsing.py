@@ -25,10 +25,18 @@ class Database(object):
         electrodes_collection.create_index([('patient_id', "hashed")])
         electrodes_collection.create_index([('electrode', 1)])
         electrodes_collection.create_index([('type', "hashed")])
+        electrodes_collection.create_index([('loc2', pymongo.TEXT)],
+                                           default_language='english')
+        electrodes_collection.create_index([('loc3', pymongo.TEXT)],
+                                           default_language='english')
         electrodes_collection.create_index([('loc5', pymongo.TEXT)],
                                            default_language='english')
 
         event_collection = db.HFOs
+        event_collection.create_index([('loc2', pymongo.TEXT)],
+                                      default_language='english')
+        event_collection.create_index([('loc3', pymongo.TEXT)],
+                                      default_language='english')
         event_collection.create_index([('loc5', pymongo.TEXT)],
                                       default_language='english')
         event_collection.create_index(
@@ -90,16 +98,31 @@ def query_filters(intraop, event_type_names, loc, loc_name, hfo_subtypes=None,
                   'type': {'$in': [encode_type_name(e) for e in
                                    event_type_names],
                           },  # order doesnt matter
-                  'freq_av': {'$ne': 0},
-                  'freq_pk': {'$ne': 0},
-                  'power_av': {'$ne': 0},
-                  'power_pk': {'$ne': 0}
+
                   }
     if hfo_subtypes is not None:  # This says that it belongs to a subtype of a type in evt filter or the event is a Spike that doesnt have subtypes
-        evt_filter['$or'] = [
-            {'$or': [{subtype: 1} for subtype in hfo_subtypes]},
-            {'type': {'$in': ['Spikes', 'Sharp Spikes']}}]
 
+        #O soy un hfo o un spike
+        evt_filter['$or'] = [{'$and': [{'$or': [{subtype: 1} for subtype in
+                                      hfo_subtypes]},
+                                        {'freq_av': {'$ne': 0}},
+                                       {'freq_pk': {'$ne': 0}},
+                                       {'power_av': {'$ne': 0}},
+                                       {'power_pk': {'$ne': 0}},
+
+                                       ]},
+                             {'type': {'$in': [encode_type_name(t) for t in
+                                              ['Spikes', 'Sharp Spikes']]}}
+                             ]
+    else:
+        evt_filter['$or'] = [{'$and': [{'freq_av': {'$ne': 0}},
+                                       {'freq_pk': {'$ne': 0}},
+                                       {'power_av': {'$ne': 0}},
+                                       {'power_pk': {'$ne': 0}}
+                                       ] },
+                             {'type': {'$in': [encode_type_name(t) for t in
+                                               ['Spikes', 'Sharp Spikes']]}}
+                            ]
     if not allow_null_coords:
         elec_filter['x'] = {"$ne": "-1"}
         elec_filter['y'] = {"$ne": "-1"}
@@ -146,7 +169,7 @@ def parse_electrodes(patients, elec_cursor, event_type_names):
         # Patient level
         patient_id = e['patient_id']
         if patient_id not in patients.keys():
-            patient = Patient(id=patient_id, age=parse_age(e), electrodes=[])
+            patient = Patient(id=patient_id, age=parse_age(e))
             patients[patient_id] = patient
         else:
             patient = patients[patient_id]
@@ -240,7 +263,7 @@ def parse_events(patients, event_collection, event_type_names, models_to_run,
         if patient_id not in patients.keys():
             # raise RuntimeWarning('The parse_electrodes may should have had the patient created first')
             patient = Patient(id=patient_id, age=parse_age(
-                evt), electrodes=[])  # optionally you could create it in this
+                evt))
             # moment
             patients[patient.id] = patient
         else:
@@ -328,8 +351,6 @@ def parse_events(patients, event_collection, event_type_names, models_to_run,
 
         # Elec count update
         evt_type = decode_type_name(evt['type'])
-        if evt_type == 'Spikes':
-            print(evt)
         if file_block not in electrode.evt_count[evt_type].keys():
             electrode.evt_count[evt_type][file_block] = 1
         else:
@@ -353,9 +374,12 @@ def parse_events(patients, event_collection, event_type_names, models_to_run,
             fr_duration=float(evt['fr_duration']),
             r_duration=float(evt['r_duration']),
             freq_av=float(evt['freq_av']),
-            freq_pk=float(evt['freq_pk']),
-            power_av=mt.log10(float(evt['power_av'])),
-            power_pk=mt.log10(float(evt['power_pk'])),
+            freq_pk=float(evt['freq_pk']), #spikes have 0 frec and power but
+            # they aren't used in ml so we just leave a None there
+            power_av= None if evt['power_av'] == 0 else mt.log10(float(evt[
+                                                               'power_av'])),
+            power_pk= None if evt['power_pk'] == 0 else mt.log10(float(evt[
+                                                               'power_pk'])),
             loc1=loc1,  # electrode.
             loc2=loc2,
             loc3=loc3,

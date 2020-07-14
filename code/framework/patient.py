@@ -2,7 +2,9 @@ import copy
 
 
 class Patient():
-    def __init__(self, id, age, electrodes=copy.deepcopy([])):
+    def __init__(self, id, age, electrodes=None):
+        if electrodes is None:
+            electrodes = []
         self.id = id
         self.age = age
         self.electrodes = electrodes

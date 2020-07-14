@@ -26,7 +26,6 @@ class Driver():
     def run_experiment(self, number, roman_num, letter):
         NOT_IMPLEMENTED_EXP = NotImplementedError('Not implemented experiment')
         REVIEW_AND_INFORM = RuntimeError('Last review to inform')
-        INFORM = RuntimeError('Ready to move to overleaf')
         if number == 1:
             print('Running exp 1) Data Global analysis')
 
@@ -57,7 +56,6 @@ class Driver():
                                                  Path(exp_save_path[1],
                                                       'localized_table')))
 
-            raise INFORM
         elif number == 2:
             if roman_num == 'i':
                 print('Running exp 2.i) HFO rate in SOZ vs NSOZ in Whole brain')
@@ -74,12 +72,13 @@ class Driver():
                      evt_types_to_cmp=[[t] for
                                        t in
                                        HFO_TYPES],
-                     locations={0:'Whole '
-                                  'brain'},
+                     locations={0:['Whole '
+                                  'Brain']},
                      saving_path=exp_save_path[2]['i']
                      )
                 hfo_rate_statistical_tests(
-                    patients_dic=data_by_loc['patients_dic'],
+                    rates_by_type={t: data_by_loc['Whole Brain'][t+'_rates']
+                                    for t in HFO_TYPES },
                     types=HFO_TYPES,
                     saving_path=exp_save_path[2]['i'])
 
@@ -98,11 +97,12 @@ class Driver():
                     evt_types_to_cmp=[[t] for
                                       t in
                                       HFO_TYPES],
-                    locations={5: 'Hippocampus'},
+                    locations={5: ['Hippocampus']},
                     saving_path=exp_save_path[2]['ii']
                 )
                 hfo_rate_statistical_tests(
-                    patients_dic=data_by_loc['patients_dic'],
+                    rates_by_type={t: data_by_loc['Hippocampus'][t+'_rates']
+                                    for t in HFO_TYPES },
                     types=HFO_TYPES,
                     saving_path=exp_save_path[2]['ii'])
             else:  # roman_num
@@ -110,7 +110,6 @@ class Driver():
         elif number == 3:
             # Se quiere mejorar el rendimiento del rate de los distintos tipos
             # de HFO, para eso veamos los baselines
-            # TODO move to soz_predictor module
             # TODO add to overleaf
             if roman_num == '0':
                 print('Running exp 3.0) Predicting SOZ with rates: Baselines '

@@ -200,8 +200,7 @@ def evt_rate_soz_pred_baseline_localized(elec_collection,
             event_type_data_by_loc[loc_name] = dict()
             if local_filter:
                 whole_brain_name = first_key(patients_by_loc)
-                patients_dic = patients_by_loc[
-                    whole_brain_name]  # whole_brain_name
+                patients_dic = patients_by_loc[whole_brain_name]  # whole_brain_name
             else:
                 patients_dic = patients_by_loc[loc_name]
             # Create info header
@@ -209,7 +208,7 @@ def evt_rate_soz_pred_baseline_localized(elec_collection,
                                         'loc_{g}'.format(g=granularity),
                                         loc_name.replace(' ', '_'),
                                         loc_name.replace(' ', '_') +
-                                        '_sleep_tagged'))
+                                        '_sleep'))
             # Create parents dirs if they dont exist
             info_saving_path = file_saving_path + '_info.txt'
             Path(info_saving_path).parent.mkdir(0o777, parents=True,
@@ -235,8 +234,6 @@ def evt_rate_soz_pred_baseline_localized(elec_collection,
 
                         if loc_name not in data_by_loc.keys():
                             data_by_loc[loc_name] = dict()
-                            data_by_loc[loc_name]['patients_dic'] = loc_info[
-                                'patients_dic_in_loc']
 
                         event_type_data_by_loc[loc_name][type_group_name] = \
                             loc_info
@@ -247,11 +244,12 @@ def evt_rate_soz_pred_baseline_localized(elec_collection,
                         data_by_loc[loc_name][type_group_name + '_AUC'] = \
                             loc_info['AUC_ROC']
                         data_by_loc[loc_name][type_group_name + '_rates'] = \
-                            dict(soz=loc_info['soz_rates'], nsoz=['nsoz_rates'])
+                            dict(soz=loc_info['soz_rates'], nsoz=loc_info[
+                                'nsoz_rates'])
+                        # vez de rates_by_type, estaba entrando un solo tipo
+                        # en region info
                     else:
-                        print('Region and type excluded because lack of data '
-                              '--> {'
-                              '0} {1}'.format(loc_name, type_group_name))
+                        print('Region and type excluded because lack of data --> {0} {1}'.format(loc_name, type_group_name))
         '''
         graphics.event_rate_by_loc(event_type_data_by_loc,
                                    metrics=['pse', 'pnee', 'auc'],
@@ -269,7 +267,7 @@ def evt_rate_soz_pred_baseline_localized(elec_collection,
 # If loc is None all the dic is considered, otherwise only the location asked
 def region_info(patients_dic, event_types=EVENT_TYPES, flush=False,
                 conf=None, location=None):
-    # print('Region info location {0}, types {1}.'.format(location, event_types))
+    print('Region info location {0}, types {1}.'.format(location, event_types))
     patients_with_epilepsy = set()
     elec_count_per_patient = []
     elec_x_null, elec_y_null, elec_z_null = 0, 0, 0  # todo create dic
@@ -327,9 +325,9 @@ def region_info(patients_dic, event_types=EVENT_TYPES, flush=False,
             elec_evt_count = e.get_events_count(event_types)
             elec_with_evt_count = elec_with_evt_count + 1 if elec_evt_count > 0 else elec_with_evt_count
             event_count += elec_evt_count
+
             for type in event_types:
-                for fileblock, count in e.evt_count[type].items():
-                    counts[type] += count
+                counts[type] += e.get_events_count([type])
 
             evt_rate = e.get_events_rate(event_types)  # Measured in events/min
             event_rates.append(evt_rate)

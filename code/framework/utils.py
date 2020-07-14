@@ -66,8 +66,11 @@ def print_info(info_evts, file):
     print(header, file=file)
     print(sep, file=file)
     for k, v in info_evts.items():
-        if k != 'soz_labels':
-            k, v = (k, v) if k != 'evt_rates' else ('mean_of_rates', np.mean(v))
+        k, v = (k, v) if k != 'evt_rates' else ('mean_of_rates', np.mean(v))
+        if isinstance(v, list) or k == 'patients_dic_in_loc': #too long to be
+            # printed
+            continue
+        else:
             row = '{attr} || {value}'.format(attr=k.ljust(attributes_width), value=str(v))
             print(row, file=file)
 

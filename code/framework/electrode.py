@@ -21,7 +21,7 @@ class Electrode():
         self.loc4 = loc4
         self.loc5 = loc5
         self.events = events
-        self.evt_count = {type: {} for type in EVENT_TYPES}
+        self.evt_count = {type: {} for type in event_type_names}
 
     def add(self, event):
         self.events[event.info['type']].append(event)
