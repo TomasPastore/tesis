@@ -1,9 +1,9 @@
 from partition_builder import pull_apart_validation_set, patients_with_more_than
 
-
+# REMOVER MODULO, METER
 def param_tuning(hfo_type_name, patients_dic):
     print('Analizying models for hfo type: {0} in {1}... '.format(hfo_type_name, 'Hippocampus'))
-    patients_dic, _ = patients_with_more_than(0, hfo_type_name, patients_dic)
+    patients_dic, _ = patients_with_more_than(0, patients_dic, hfo_type_name)
     model_patients, validation_patients = pull_apart_validation_set(patients_dic, hfo_type_name)
     model_patient_names = [p.id for p in model_patients]  # Obs mantiene el orden de model_patients
     field_names = ml_field_names(hfo_type_name)

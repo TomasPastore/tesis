@@ -1,5 +1,7 @@
 import copy
 
+from db_parsing import get_granularity
+
 
 class Patient():
     def __init__(self, id, age, electrodes=None):
@@ -24,6 +26,7 @@ class Patient():
             return [e for e in self.electrodes if e.name==e_name][0]
         except IndexError:
             raise IndexError('Electrode not present in patient')
+
     def print(self):
         print('Printing patient {0}: '.format(self.id))
         print('\tAge: {0}'.format(self.age))
@@ -32,10 +35,12 @@ class Patient():
             e.print()
         print('------------------------------------------')
 
-    #Esta sirve para hacer particiones balanceadas, porque minimizo el balanceo de grupos de pacientes.
-    #No me importa el balance por paciente sino por zona
-    #TODO review or remove
-    def get_class_balance(self, hfo_type_name):
+    # Esta sirve para hacer particiones balanceadas,
+    # minimizo el desbalanceo entre grupos de pacientes.
+    # Si hago que los sets de test esten balanceados en clases hace que el
+    # entrenamiento este desbalanceado y prediga mal. Es mejor balancear
+    # entrenamiento. Mejor no usar.
+    def get_classes_weight(self, hfo_type_name):
         negative_class_count = 0
         positive_class_count = 0
         tot_count=0
@@ -54,15 +59,16 @@ class Patient():
         return any([getattr(e, 'loc{i}'.format(i=get_granularity(loc)))
                     == loc for e in self.electrodes])
 
-    # Returns true iff the electrode has soz activity in loc_name
-    def has_epilepsy_in_loc(self, granularity, loc_name):
-        if granularity == 0:  # Has epilepsy in any part of the brain
+    # Returns true iff self has soz electrode in loc_name
+    def has_epilepsy_in_loc(self, loc_name):
+        if loc_name == 'Whole Brain':  # Has epilepsy in any part of the brain
             return any([e.soz for e in self.electrodes])  # assumes that e.soz is already parsed
         else: # looks if any soz electrode matches its loc_name in the correct granularity tags
+            granularity = get_granularity(loc_name)
             return any([e.soz and getattr(e, e.loc_field_by_granularity(granularity)) == loc_name for e in self.electrodes])
 
-    def has_epilepsy_in_all_locs(self, granularity, locations):
-        return all([self.has_epilepsy_in_loc(granularity, location) for location in locations])
+    def has_epilepsy_in_all_locs(self, locations):
+        return all([self.has_epilepsy_in_loc(location) for location in locations])
 
     # Iff all electrodes are loc field is inside the list allowed, given as parameter locations
     # "empty" in locations allows null elements

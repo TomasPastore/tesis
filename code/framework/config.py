@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from models import naive_bayes, random_forest, svm_m, balanced_random_forest, \
+from ml_algorithms import naive_bayes, random_forest, svm_m, balanced_random_forest, \
     xgboost, sgd, simulator
 
 DEBUG = True
@@ -135,6 +135,8 @@ exp_save_path[3]['iii']['dir'] = str(Path(exp_save_path[3]['dir'],
 exp_save_path[4] = dict()
 exp_save_path[4]['dir'] = str(Path(EXPERIMENTS_FOLDER, '4_ml_hfo_classifiers'))
 
+VALIDATION_NAMES_BY_LOC_PATH = str(Path(exp_save_path[4]['dir'],
+                                        'validations_names_by_loc'))
 exp_save_path[4]['i'] = dict()
 exp_save_path[4]['i']['a'] = str(Path(exp_save_path[4]['dir'],
                                       '4_i_whole_brain/4_i_a_coords_untag')) #dir
@@ -142,7 +144,7 @@ exp_save_path[4]['i']['b'] = str(Path(exp_save_path[4]['dir'],
                                       '4_i_whole_brain/4_i_b_coords_tag'))  # dir
 exp_save_path[4]['ii'] = dict()
 exp_save_path[4]['ii']['Hippocampus'] = str(Path(exp_save_path[4]['dir'],
-                                                 '4_ii_localized_Hippocampus/4_ii_Hippocampus_coords_tagged'))  # full path
+                                                 '4_ii_localized_Hippocampus'))  #dir
 
 # orca dependency is required if you want automatically save plotly figs, if the
 # path doesnt exist code will skip this save

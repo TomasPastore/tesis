@@ -25,18 +25,12 @@ class Database(object):
         electrodes_collection.create_index([('patient_id', "hashed")])
         electrodes_collection.create_index([('electrode', 1)])
         electrodes_collection.create_index([('type', "hashed")])
-        electrodes_collection.create_index([('loc2', pymongo.TEXT)],
-                                           default_language='english')
-        electrodes_collection.create_index([('loc3', pymongo.TEXT)],
-                                           default_language='english')
+
         electrodes_collection.create_index([('loc5', pymongo.TEXT)],
                                            default_language='english')
 
         event_collection = db.HFOs
-        event_collection.create_index([('loc2', pymongo.TEXT)],
-                                      default_language='english')
-        event_collection.create_index([('loc3', pymongo.TEXT)],
-                                      default_language='english')
+
         event_collection.create_index([('loc5', pymongo.TEXT)],
                                       default_language='english')
         event_collection.create_index(
@@ -361,9 +355,9 @@ def parse_events(patients, event_collection, event_type_names, models_to_run,
             x=x,
             y=y,
             z=z,
-            prediction={m: 0 for m in models_to_run},
+            prediction={m: [] for m in models_to_run},
             # for saving results of a model
-            proba={m: 0 for m in models_to_run},
+            proba={m: [] for m in models_to_run},
             # for saving results of a model
             soz=soz,
             type=decode_type_name(evt['type']),

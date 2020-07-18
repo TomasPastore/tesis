@@ -98,21 +98,21 @@ def evt_rate_soz_pred_baseline_whole_brain(elec_collection, evt_collection,
 def pse_hfo_rate_auc_relation(elec_collection, evt_collection):
     event_type_data_by_loc, data_by_loc = \
         evt_rate_soz_pred_baseline_localized(elec_collection,
-                                           evt_collection,
-                                           intraop=False,
-                                           load_untagged_coords_from_db=True,
-                                           load_untagged_loc_from_db=True,
-                                           restrict_to_tagged_coords=True,
-                                           restrict_to_tagged_locs=True,
-                                           evt_types_to_load=HFO_TYPES,
-                                           evt_types_to_cmp=[[t] for
+                                             evt_collection,
+                                             intraop=False,
+                                             load_untagged_coords_from_db=True,
+                                             load_untagged_loc_from_db=True,
+                                             restrict_to_tagged_coords=True,
+                                             restrict_to_tagged_locs=True,
+                                             evt_types_to_load=HFO_TYPES,
+                                             evt_types_to_cmp=[[t] for
                                                              t in
                                                              HFO_TYPES],
-                                           locations={
+                                             locations={
                                                g: ALL_loc_names(g)
                                                for g
                                                in [2, 3, 5]},
-                                           saving_path=
+                                             saving_dir=
                                            exp_save_path[3]['ii'][
                                                'dir'])
 
@@ -144,9 +144,10 @@ def evt_rate_soz_pred_baseline_localized(elec_collection,
                                                                'Spikes']],
                                          locations={g: all_loc_names(g) for g
                                                     in [2, 3, 5]},
-                                         saving_path=
+                                         saving_dir=
                                          exp_save_path[3]['iii']['dir'],
-                                         models_to_run=models_to_run):
+                                         models_to_run=models_to_run,
+                                         loc_pat_dic=None):
     print('SOZ predictor localized')
     print('Intraop: {intr}'.format(intr=intraop))
     print('load_untagged_coords_from_db: {0}'.format(
@@ -204,7 +205,7 @@ def evt_rate_soz_pred_baseline_localized(elec_collection,
             else:
                 patients_dic = patients_by_loc[loc_name]
             # Create info header
-            file_saving_path = str(Path(saving_path,
+            file_saving_path = str(Path(saving_dir,
                                         'loc_{g}'.format(g=granularity),
                                         loc_name.replace(' ', '_'),
                                         loc_name.replace(' ', '_') +
@@ -226,6 +227,7 @@ def evt_rate_soz_pred_baseline_localized(elec_collection,
                                            location=loc_name if loc_name !=
                                                                 'Whole Brain'
                     else None)
+
                     min_pat_count_in_location = 12
                     min_pat_with_epilepsy_in_location = 3
                     if loc_info['patient_count'] >= min_pat_count_in_location \
@@ -246,8 +248,10 @@ def evt_rate_soz_pred_baseline_localized(elec_collection,
                         data_by_loc[loc_name][type_group_name + '_rates'] = \
                             dict(soz=loc_info['soz_rates'], nsoz=loc_info[
                                 'nsoz_rates'])
-                        # vez de rates_by_type, estaba entrando un solo tipo
-                        # en region info
+                        if loc_name == loc_pat_dic:
+                            data_by_loc[loc_pat_dic]['patients_dic']= \
+                                loc_info['patients_dic_in_loc']
+
                     else:
                         print('Region and type excluded because lack of data --> {0} {1}'.format(loc_name, type_group_name))
         '''
@@ -286,7 +290,7 @@ def region_info(patients_dic, event_types=EVENT_TYPES, flush=False,
     for p_name, p in patients_dic.items():
         if location is None:
             electrodes = p.electrodes
-            pat_in_loc[p_name] = p
+            #pat_in_loc[p_name] = p
         else:
             electrodes = [e for e in p.electrodes if getattr(e,
                                                              'loc{i}'.format(i=

@@ -16,7 +16,9 @@ import math as mt
 
 
 # 2) HFO rate in SOZ vs NSOZ  ##################################################################
-# Note: HFO rate is defined in patient.py module as a method for the electrode object
+# Note: HFO rate is defined in patient.py module as a method for the
+# electrode object
+# TODO probar que se impriman de a 4 subfigures de los tipos?
 def hfo_rate_statistical_tests(rates_by_type, types=HFO_TYPES,
                                saving_path=exp_save_path[2]['dir']):
     # Calculating Stat and pvalue and plotting
@@ -46,7 +48,7 @@ def hfo_rate_statistical_tests(rates_by_type, types=HFO_TYPES,
                                                type=t,
                                                stats=stats,
                                                test_names=test_names,
-                                               saving_path=saving_path)
+                                               saving_dir=saving_path)
 
 
 # 4) ML HFO classifiers
@@ -59,7 +61,7 @@ def feature_statistical_tests(patients_dic,
                               location=None,
                               types=HFO_TYPES,
                               features=['duration', 'freq_pk', 'power_pk'],
-                              saving_path=exp_save_path[4]['dir']):
+                              saving_dir=exp_save_path[4]['dir']):
     # Structure initialization
     feature_data = dict()
     stats = dict()
@@ -135,5 +137,5 @@ def feature_statistical_tests(patients_dic,
                                                        type=t,
                                                        stats=stats,
                                                        test_names=test_names,
-                                                       saving_path=saving_path)
+                                                       saving_dir=saving_dir)
 

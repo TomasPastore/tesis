@@ -4,6 +4,7 @@ import math as mt
 import time
 from itertools import chain, combinations
 from sys import version as py_version
+import json
 
 import numpy as np
 from astropy import units as u
@@ -16,10 +17,13 @@ running_py_3_5 = py_version[2] == '5'
 if running_py_3_5:
     import matlab.engine
 
-def save_json(electrodes_info_p):
-    import json
-    with open("patient_electrode_info.json", "w") as file:
-        json.dump(electrodes_info_p, file, indent=4, sort_keys=True)
+def save_json(info_dic, saving_path):
+    with open(saving_path+'.json', "w") as file:
+        json.dump(info_dic, file, indent=4, sort_keys=True)
+
+def load_json(saving_path):
+    with open(saving_path) as json_file:
+        return json.load(json_file)
 
 def log(msg=None, msg_type=None, patient=None, electrode=None):
     print_msg = False

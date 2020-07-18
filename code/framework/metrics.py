@@ -7,7 +7,7 @@ from sklearn.metrics import classification_report, confusion_matrix, accuracy_sc
 from sklearn.metrics import roc_auc_score, roc_curve, auc
 from sklearn.tree import export_graphviz
 from sklearn.metrics import average_precision_score
-
+# INTENTAR REMOVER MODULO
 def print_roc_auc(labels, preds):
     fpr, tpr, threshold = roc_curve(labels, preds)
     assert(auc(fpr, tpr) == roc_auc_score(labels, preds))

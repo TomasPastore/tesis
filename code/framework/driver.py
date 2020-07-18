@@ -25,7 +25,6 @@ class Driver():
 
     def run_experiment(self, number, roman_num, letter):
         NOT_IMPLEMENTED_EXP = NotImplementedError('Not implemented experiment')
-        REVIEW_AND_INFORM = RuntimeError('Last review to inform')
         if number == 1:
             print('Running exp 1) Data Global analysis')
 
@@ -37,7 +36,7 @@ class Driver():
                                              self.evt_collection,
                                      intraop=False,
                                      locations={0: ['Whole Brain']},
-                                     event_type_names=EVENT_TYPES,
+                                     event_type_names=HFO_TYPES+['Spikes'],
                                      restrict_to_tagged_coords=False,
                                      restrict_to_tagged_locs=False,
                                      saving_path=str(Path(exp_save_path[1],
@@ -48,8 +47,8 @@ class Driver():
                                              locations={
                                                g: ALL_loc_names(g)
                                                for g
-                                               in [2, 3, 5]},
-                                             event_type_names=EVENT_TYPES,
+                                               in [2,3,5]},
+                                             event_type_names=HFO_TYPES+['Spikes'],
                                              restrict_to_tagged_coords=True,
                                              restrict_to_tagged_locs=True,
                                              saving_path=str(
@@ -74,16 +73,32 @@ class Driver():
                                        HFO_TYPES],
                      locations={0:['Whole '
                                   'Brain']},
-                     saving_path=exp_save_path[2]['i']
+                     saving_dir=exp_save_path[2]['i']
                      )
                 hfo_rate_statistical_tests(
                     rates_by_type={t: data_by_loc['Whole Brain'][t+'_rates']
                                     for t in HFO_TYPES },
                     types=HFO_TYPES,
-                    saving_path=exp_save_path[2]['i'])
+                    saving_path=str(Path(exp_save_path[2]['i'],
+                                        'loc_0',
+                                        'Whole_Brain',
+                                        '2i_Whole_Brain'))
+                )
 
             elif roman_num == 'ii':
                 print('Running exp 2.ii) HFO rate in SOZ vs NSOZ localized')
+                def ba(id):
+                    return 'Brodmann area {id}'.format(id=id)
+                # Defined in experiment 1 by being the regions with more data
+                # and more SOZ patients.
+                priority_locs = {2:['Temporal Lobe', 'Limbic Lobe', 'Frontal Lobe'],
+                                 3:['Parahippocampal Gyrus',
+                                    'Middle Temporal Gyrus', 'Sub-Gyral',
+                                    'Superior Temporal Gyrus', 'Uncus',
+                                    'Fusiform Gyrus'],
+                                 5:['Hippocampus', 'Amygdala', ba(20),
+                                    ba(21), ba(28), ba(36)]
+                                 }
                 event_type_data_by_loc, \
                 data_by_loc = evt_rate_soz_pred_baseline_localized(
                     self.elec_collection,
@@ -97,20 +112,27 @@ class Driver():
                     evt_types_to_cmp=[[t] for
                                       t in
                                       HFO_TYPES],
-                    locations={5: ['Hippocampus']},
-                    saving_path=exp_save_path[2]['ii']
+                    locations=priority_locs,
+                    saving_dir=exp_save_path[2]['ii']
                 )
-                hfo_rate_statistical_tests(
-                    rates_by_type={t: data_by_loc['Hippocampus'][t+'_rates']
-                                    for t in HFO_TYPES },
-                    types=HFO_TYPES,
-                    saving_path=exp_save_path[2]['ii'])
+                for loc, locs in priority_locs.items():
+                    for loc_name in locs:
+                        hfo_rate_statistical_tests(
+                            rates_by_type={t: data_by_loc[loc_name][t+'_rates']
+                                            for t in HFO_TYPES },
+                            types=HFO_TYPES,
+                            saving_path=str(Path(exp_save_path[2]['ii'],
+                                            'loc_{g}'.format(g=loc),
+                                            loc_name.replace(' ', '_'),
+                                                 '2ii_localized'))
+                        )
             else:  # roman_num
                 raise NOT_IMPLEMENTED_EXP
         elif number == 3:
             # Se quiere mejorar el rendimiento del rate de los distintos tipos
             # de HFO, para eso veamos los baselines
             # TODO add to overleaf
+            # TODO change for localized version
             if roman_num == '0':
                 print('Running exp 3.0) Predicting SOZ with rates: Baselines '
                       '(first steps)')
@@ -131,6 +153,8 @@ class Driver():
                 if letter == 'a':
                     print('Running exp 3.i.a) Predicting SOZ with rates: '
                           'Baselines (Whole brain coords untagged)')
+                    # TODO change for localized version
+
                     # Ma)ML with 91 patients without using coords (untagged)
                     # Whole brain rates for independent event types:
                     evt_rate_soz_pred_baseline_whole_brain(self.elec_collection,
@@ -157,6 +181,8 @@ class Driver():
                     # it improves AUC 2%, we loose 34 patients, but there are
                     # still 2 electrodes in None because of bad format of
                     # the field (empty lists map to None) from db
+                    # TODO change for localized version
+
                     evt_rate_soz_pred_baseline_whole_brain(self.elec_collection,
                                                            self.evt_collection,
                                                            intraop=False,
@@ -203,7 +229,7 @@ class Driver():
                                                              g: all_loc_names(g)
                                                              for g
                                                              in [2, 3, 5]},
-                                                         saving_path=
+                                                         saving_dir=
                                                          exp_save_path[3]['ii'][
                                                              'dir'])
 
@@ -216,8 +242,8 @@ class Driver():
             if roman_num == 'i':
                 if letter == 'a':
                     # Whole brain without x, y, z in ml
-                    saving_path = str(Path(exp_save_path[4]['i']['a'],
-                                           '4ia_coords_untag'))
+                    saving_dir = exp_save_path[4]['i']['a'] #dir
+                    saving_path = str(Path(saving_dir,'untagged'))
                     baselines_data, patients_dic = evt_rate_soz_pred_baseline_whole_brain(
                         self.elec_collection,
                         self.evt_collection,
@@ -235,25 +261,26 @@ class Driver():
                                               types=['RonO', 'Fast RonO'],
                                               features=ml_field_names('RonO',
                                                                       include_coords=False),
-                                              saving_path=saving_path)
+                                              saving_dir=saving_dir)
                     feature_statistical_tests(patients_dic,
                                               types=['RonS', 'Fast RonS'],
                                               features=ml_field_names('RonS',
                                                                       include_coords=False),
-                                              saving_path=saving_path)
+                                              saving_dir=saving_dir)
                     for hfo_type in HFO_TYPES:
                         ml_hfo_classifier(patients_dic,
-                                       location='Whole Brain',
-                                       hfo_type=hfo_type,
-                                       use_coords=False,
-                                       saving_path=str(Path(saving_path,
-                                                            'ml_training',
-                                                            hfo_type)))
+                                          location='Whole Brain',
+                                          hfo_type=hfo_type,
+                                          use_coords=False,
+                                          ml_models=['XGBoost'],
+                                          saving_dir=str(Path(saving_dir,
+                                                              hfo_type)))
 
                 elif letter == 'b':
                     # Whole brain with x, y, z in ml
-                    saving_path = str(Path(exp_save_path[4]['i']['b'],
-                                           '4ib_coords_tag'))
+                    saving_dir = exp_save_path[4]['i']['b'] #dir
+                    saving_path = str(Path(saving_dir,'tagged'))
+
                     baselines_data, patients_dic = evt_rate_soz_pred_baseline_whole_brain(
                         self.elec_collection,
                         self.evt_collection,
@@ -271,62 +298,62 @@ class Driver():
                                               types=['RonO', 'Fast RonO'],
                                               features=ml_field_names('RonO',
                                                                       include_coords=True),
-                                              saving_path=saving_path)
+                                              saving_dir=saving_dir)
 
                     feature_statistical_tests(patients_dic,
                                               types=['RonS', 'Fast RonS'],
                                               features=ml_field_names('RonS',
                                                                       include_coords=True),
-                                              saving_path=saving_path)
+                                              saving_dir=saving_dir)
                     for hfo_type in HFO_TYPES:
                         ml_hfo_classifier(patients_dic,
                                        location='Whole Brain',
                                        hfo_type=hfo_type,
                                        use_coords=True,
-                                       saving_path=str(Path(saving_path,
-                                                            'ml_training',
-                                                            hfo_type)))
+                                       saving_dir=str(Path(saving_dir,
+                                                              hfo_type)))
             elif roman_num == 'ii':
                 if letter == 'a':
                     # Localized: Hippocampus
-                    saving_path = exp_save_path[4]['ii']['Hippocampus']
+                    saving_dir = exp_save_path[4]['ii']['Hippocampus'] #dir
                     baselines_data, data_by_loc = \
                         evt_rate_soz_pred_baseline_localized(self.elec_collection,
-                                                         self.evt_collection,
-                                                         intraop=False,
-                                                         load_untagged_coords_from_db=True,
-                                                         load_untagged_loc_from_db=True,
-                                                         restrict_to_tagged_coords=True,
-                                                         restrict_to_tagged_locs=True,
-                                                         evt_types_to_load=HFO_TYPES,
-                                                         evt_types_to_cmp=[[t]
+                                                             self.evt_collection,
+                                                             intraop=False,
+                                                             load_untagged_coords_from_db=True,
+                                                             load_untagged_loc_from_db=True,
+                                                             restrict_to_tagged_coords=True,
+                                                             restrict_to_tagged_locs=True,
+                                                             evt_types_to_load=HFO_TYPES,
+                                                             evt_types_to_cmp=[[t]
                                                                            for
                                                                            t in
                                                                            HFO_TYPES],
-                                                         locations={
+                                                             locations={
                                                              5: 'Hippocampus'},
-                                                         saving_path=saving_path)
-                    patients_dic = data_by_loc['patients_dic']
+                                                             saving_dir=saving_dir,
+                                                             loc_pat_dic='Hippocampus')
+                    patients_dic = data_by_loc['Hippocampus']['patients_dic']
+                    print('Hippocampus pat dic {0}'.format(patients_dic))
                     feature_statistical_tests(patients_dic,
                                               location='Hippocampus',
                                               types=['RonO', 'Fast RonO'],
                                               features=ml_field_names('RonO',
                                                                       include_coords=True),
-                                              saving_path=saving_path)
+                                              saving_dir=saving_dir)
                     feature_statistical_tests(patients_dic,
                                               location='Hippocampus',
                                               types=['RonS', 'Fast RonS'],
                                               features=ml_field_names('RonS',
                                                                       include_coords=True),
-                                              saving_path=saving_path)
+                                              saving_dir=saving_dir)
                     for hfo_type in HFO_TYPES:
                         ml_hfo_classifier(patients_dic,
                                           location='Hippocampus',
                                           hfo_type=hfo_type,
                                           use_coords=False,
-                                          saving_path=str(Path(saving_path,
-                                                               'ml_training',
-                                                               hfo_type)))
+                                          saving_dir=str(Path(saving_dir,
+                                                              hfo_type)))
             # Usar sklearn pipeline
             # Resultados: xgboost, model_patients (%75), random partition, robust scaler, balanced, filter 0.7 da 0.8 de AP
             # hippocampus_hfo_classifier(self.elec_collection,
