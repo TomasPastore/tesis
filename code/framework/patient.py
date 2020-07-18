@@ -1,6 +1,5 @@
 import copy
 
-from db_parsing import get_granularity
 
 
 class Patient():
@@ -61,6 +60,8 @@ class Patient():
 
     # Returns true iff self has soz electrode in loc_name
     def has_epilepsy_in_loc(self, loc_name):
+        from db_parsing import get_granularity
+
         if loc_name == 'Whole Brain':  # Has epilepsy in any part of the brain
             return any([e.soz for e in self.electrodes])  # assumes that e.soz is already parsed
         else: # looks if any soz electrode matches its loc_name in the correct granularity tags

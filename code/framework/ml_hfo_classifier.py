@@ -1,34 +1,14 @@
 import copy
-import itertools
-import math as mt
-import random
-import graphics
-import matplotlib.pyplot as plt
+
 import numpy as np
-import pandas as pd
-from imblearn.combine import SMOTETomek  # doctest: +NORMALIZE_WHITESPACE
-from imblearn.under_sampling import CondensedNearestNeighbour, \
-    NeighbourhoodCleaningRule
-from scipy import interp
-from sklearn.metrics import roc_curve, auc, roc_auc_score
-from sklearn.preprocessing import StandardScaler
-from sklearn.preprocessing import RobustScaler
+from sklearn.metrics import roc_curve
 
-from config import models_to_run, models_dic, EVENT_TYPES
-from partition_builder import patients_with_more_than, build_patient_sets, \
-    pull_apart_validation_set, \
-    get_balanced_partition, build_folds
-
-from metrics import print_metrics
-from ml_algorithms import xgboost
+import graphics
+from config import models_dic
 from graphics import ml_training_plot
-from sklearn.metrics import precision_recall_curve, average_precision_score, \
-    f1_score
-import xgboost as xgb
-from xgboost.sklearn import XGBClassifier
-from sklearn import metrics  # Additional scklearn functions
-from sklearn.model_selection import GridSearchCV
-from random import random
+from metrics import print_metrics
+from partition_builder import patients_with_more_than, build_patient_sets, \
+    build_folds
 
 #TODO
 def compare_Hippocampal_RonS_ml_models(elec_collection, evt_collection):

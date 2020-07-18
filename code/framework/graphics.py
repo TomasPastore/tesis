@@ -1,25 +1,25 @@
-import copy
 from decimal import Decimal
-import getpass
+import math as mt
+from decimal import Decimal
 from pathlib import Path
 from sys import version as py_version
-import requests
+
 import numpy as np
-import math as mt
-import sklearn.metrics as metrics
-from matplotlib import pyplot as plt, colors
 import plotly.graph_objects as go
-import plotly
-from sklearn.metrics import auc, roc_curve, precision_recall_curve, average_precision_score, plot_precision_recall_curve
+import sklearn.metrics as metrics
+from matplotlib import pyplot as plt
+from sklearn.metrics import roc_curve, precision_recall_curve, \
+    average_precision_score
 
 from config import EVENT_TYPES, intraop_patients, HFO_TYPES, color_list, \
-    models_to_run, models_dic, EXPERIMENTS_FOLDER, orca_executable
-from ml_algorithms import estimators
+    models_to_run, EXPERIMENTS_FOLDER, orca_executable, exp_save_path
+
 running_py_3_5 = py_version[2] == '5'
 if running_py_3_5:
-    import angle_clusters, get_matlab_session
+    import angle_clusters
 from db_parsing import get_granularity
-import matplotlib.style as mplstyle
+
+
 # mplstyle.use(['ggplot', 'fast'])
 
 #TODO MOVE TO DB PARSING
@@ -100,12 +100,9 @@ def plot_global_info_by_loc_table(data_by_loc, saving_path):
 # 2) HFO rate comparison and features comparison in 4)
 def plot_feature_distribution(soz_data, nsoz_data, feature, type, stats,
                               test_names, saving_dir):
-    saving_dir = str(Path(Path(saving_dir).parent,
-                          feature, type))
-    Path(saving_dir).mkdir(0o777, parents=True,
-                                        exist_ok=True)
-    fig_path = str(Path(saving_dir, str(Path(
-        saving_dir).name) + '_' + feature + '_distr.pdf'))
+    saving_dir = str(Path(saving_dir, feature, type))
+    Path(saving_dir).mkdir(0o777, parents=True, exist_ok=True)
+    fig_path = str(Path(saving_dir, feature + '_distr.pdf'))
     print('Distribution saving path: {0}'.format(fig_path))
     print('Plotting feature:{f} for type:{t}'.format(
         f=feature, t=type))
@@ -123,6 +120,8 @@ def plot_feature_distribution(soz_data, nsoz_data, feature, type, stats,
     sns.distplot(soz_data, color="red", label="SOZ", **kwargs)
     sns.distplot(nsoz_data, color="green", label="NSOZ", **kwargs)
     axes = fig.gca()
+    '''
+    # Prints stats in figure
     X = {'D':0.05, 'W':0.35, 'U':0.65}
     for S_name in test_names.keys():
         S_val = round(stats[feature][type][test_names[S_name]][S_name], 4)
@@ -138,10 +137,42 @@ def plot_feature_distribution(soz_data, nsoz_data, feature, type, stats,
                   bbox=dict(facecolor='grey', alpha=0.5),
                   transform=axes.transAxes, fontsize=12)
         #plt.xlim(50, 75)
+    '''
     plt.legend(loc='lower right')#'lower right'
     fig.savefig(fig_path)
     plt.close(fig)
     #plt.show()
+
+def plot_types_feature_distribution(rates_by_type, feature, saving_dir):
+    saving_dir = str(Path(saving_dir, feature))
+    Path(saving_dir).mkdir(0o777, parents=True, exist_ok=True)
+    fig_path = str(Path(saving_dir, feature + '_distrs.pdf'))
+    print('Distributions saving path: {0}'.format(fig_path))
+    import seaborn as sns
+    sns.set_style("white")
+    # Plot
+    subplot_index = {'RonO': 1, 'RonS': 2, 'Fast Rono':3, 'Fast RonS':4}
+    kwargs = dict(hist_kws={'alpha': .6}, kde_kws={'linewidth': 2})
+
+    fig = plt.figure(figsize=(10, 7), dpi=80)
+    fig.suptitle('{feat} SOZ vs NSOZ distributions'.format(
+        feat=feature.capitalize()),
+        fontsize=20)
+    for type in HFO_TYPES:
+        axe = plt.subplot('{r}{c}{i}'.format(r=2, c=2, i=subplot_index[type]))
+        axe.set_title(type, fontdict={'fontsize': 14}, loc='left')
+        #axe.set_xlim([0, 1])
+        #axe.set_ylim([0, 1])
+        axe.set_xlabel(feature.capitalize(), fontdict={'fontsize': 12})
+        axe.set_ylabel('Frequency', fontdict={'fontsize': 12})
+        sns.distplot(rates_by_type[type]['soz'], color="red",
+                     label="SOZ", **kwargs)
+        sns.distplot(rates_by_type[type]['nsoz'], color="green",
+                     label="NSOZ", **kwargs)
+        axe.legend(loc='lower right', prop={'size': 13})
+    fig.savefig(fig_path)
+    plt.close(fig)
+    # plt.show()
 
 
 # 3) Predicting SOZ with rate, used in almost all the steps to plot ROCs
@@ -266,7 +297,7 @@ def superimposed_rocs(plot_data, title, axe, elec_count, colors=None,
                            k in plot_data[t]['scores'].keys()])
         i+=1
 
-    axe.legend(loc='lower right', prop={'size': 10}) #TODO  HACER MAS GRANDE
+    axe.legend(loc='lower right', prop={'size': 13})
     info_text = 'Elec Count: {0}'.format(elec_count)
     plot_pse_text = True
     if len(pses) > 0 and plot_pse_text:
@@ -285,7 +316,7 @@ def superimposed_rocs(plot_data, title, axe, elec_count, colors=None,
 
 # Reviewed
 # Unique location info table
-def plot_score_in_loc_table(columns, rows, colors, saving_path):
+def plot_score_in_loc_table(columns, rows, colors=None, saving_path=None):
     col_colors = [table_color_for(t) if colors is None else color_list[i] for i, t in enumerate(sorted([r[0] for r in rows]))]
     font_colors = ['black' if c != 'blue' else 'white' for c in col_colors]
     rows = sorted(rows, key=lambda x: x[0]) #Order by HFO type name
@@ -315,7 +346,6 @@ def plot_score_in_loc_table(columns, rows, colors, saving_path):
             pad=4
         ))
     orca_save(fig, saving_path)
-    #plt.close(fig)
     #fig.show()
 
 # Reviewed
@@ -971,3 +1001,4 @@ def set_titles(x_title, y, model_name, axe):
     axe.set_ylabel(y_title)
     axe.set_title(model_name)
     axe.legend(loc="lower right")
+
