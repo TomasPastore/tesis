@@ -12,7 +12,7 @@ from stats import feature_statistical_tests, hfo_rate_statistical_tests, \
 warnings.filterwarnings("ignore", module="matplotlib")
 warnings.simplefilter(action='ignore', category=FutureWarning)
 from config import (EVENT_TYPES, HFO_TYPES, exp_save_path)
-from db_parsing import all_loc_names, ALL_loc_names
+from db_parsing import preference_locs, all_loc_names
 from ml_hfo_classifier import ml_hfo_classifier
 
 running_py_3_5 = py_version[2] == '5'
@@ -50,7 +50,7 @@ class Driver():
                                              self.evt_collection,
                                              intraop=False,
                                              locations={
-                                                 g: ALL_loc_names(g)
+                                                 g: all_loc_names(g)
                                                  for g
                                                  in [2, 3, 5]},
                                              event_type_names=HFO_TYPES + [
@@ -253,7 +253,7 @@ class Driver():
                                                                            HFO_TYPES + [
                                                                                'Spikes']],
                                                          locations={
-                                                             g: all_loc_names(g)
+                                                             g: preference_locs(g)
                                                              for g
                                                              in [2, 3, 5]},
                                                          saving_dir=

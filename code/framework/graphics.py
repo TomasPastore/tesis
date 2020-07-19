@@ -204,26 +204,29 @@ def plot_types_feature_distribution(rates_by_type, feature, saving_dir):
 # 3) Predicting SOZ with rate, used in almost all the steps to plot ROCs
 # Reviewed
 # Plots ROCs for SOZ predictor by hfo rate for different locations and event types
-# TODO hacer adaptativos los boxes
+# TODO hacer adaptativos los boxes de legends
 def event_rate_by_loc(hfo_type_data_by_loc, zoomed_type=None, metrics=['pse', 'pnee', 'auc'],
                       title=None, colors=None, conf=None,
                       roc_saving_path=EXPERIMENTS_FOLDER + 'fig',
                       change_tab_path=None):
     print('Plotting event rate by loc...')
     plt.ioff()
-    fig = plt.figure(107)
+    fig = plt.figure(107, figsize=(8,12))
 
     # Subplots frames
     subplot_count = len(hfo_type_data_by_loc.keys())
     if subplot_count == 1:
         rows = 1
         cols = 1
-    elif subplot_count < 5:
+    elif subplot_count <= 2:
+        rows = 1
+        cols = 2
+    elif subplot_count <= 4:
         rows = 2
         cols = 2
-    elif subplot_count < 7:
-        rows = 2
-        cols = 3
+    elif subplot_count <= 6:
+        rows = 3
+        cols = 2
     elif subplot_count < 10:
         rows = 3
         cols = 3
@@ -233,7 +236,7 @@ def event_rate_by_loc(hfo_type_data_by_loc, zoomed_type=None, metrics=['pse', 'p
     subplot_index = 1
     if zoomed_type is None:
         title = 'Event types\' rate (events per minute)' if title is None else title
-        fig.suptitle(title, size=14)
+        fig.suptitle(title, size=16)
     else:
         fig.suptitle('{0} subtypes\' rate (events per minute)'.format(zoomed_type))
 
@@ -269,8 +272,11 @@ def event_rate_by_loc(hfo_type_data_by_loc, zoomed_type=None, metrics=['pse', 'p
         change_tab_path = roc_saving_path if change_tab_path is None else \
             str(Path(Path(roc_saving_path).parent,
                      loc.replace(' ','_'),
-                     '3_ii_{l}_sleep_tagged'.format(l=loc.replace(' ','_'))
+                     '3_ii_{l}_sleep_tagged'.format(l=loc.replace(' ',
+                                                                  '_')) #TODO
+                     # name
                      ))
+        #Plots axe for one location and all types
         superimposed_rocs(plot_data, title, axe, elec_count, colors, change_tab_path)
         subplot_index += 1
     plt.subplots_adjust(wspace=0.4, hspace=0.4)
@@ -279,7 +285,7 @@ def event_rate_by_loc(hfo_type_data_by_loc, zoomed_type=None, metrics=['pse', 'p
         if fmt == 'pdf':
             print('ROC saving path: {0}'.format(saving_path_f))
         plt.savefig(saving_path_f, bbox_inches='tight')
-    #plt.show()
+    plt.show()
     plt.close(fig)
 
 # Reviewed
@@ -287,12 +293,12 @@ def event_rate_by_loc(hfo_type_data_by_loc, zoomed_type=None, metrics=['pse', 'p
 # It also may build tables of the global info in that location if you uncomment that piece of code
 def superimposed_rocs(plot_data, title, axe, elec_count, colors=None,
                       saving_path=None):
-    axe.set_title(title, fontdict={'fontsize': 12}, loc='left')
+    axe.set_title(title, fontdict={'fontsize': 14}, loc='left')
     axe.plot([0, 1], [0, 1], 'r--')
     axe.set_xlim([0, 1])
     axe.set_ylim([0, 1])
-    axe.set_ylabel('True Positive Rate', fontdict={'fontsize': 12})
-    axe.set_xlabel('False Positive Rate', fontdict={'fontsize': 12})
+    axe.set_ylabel('TPR', fontdict={'fontsize': 10})
+    axe.set_xlabel('FPR', fontdict={'fontsize': 11})
     # calculate the fpr and tpr for all thresholds of the classification
     roc_data, pses = [], []
     for type, info in plot_data.items():
@@ -315,7 +321,7 @@ def superimposed_rocs(plot_data, title, axe, elec_count, colors=None,
 
     #For each type
     for t, fpr, tpr, auc, conf in roc_data:
-        legend = plot_data[t]['legend'] + ' AUC_ROC %.2f.' % auc
+        legend = plot_data[t]['legend'] + ' AUC %.2f' % auc
         axe.plot(fpr, tpr, color_for(t) if colors is None else color_list[i], label=legend)
 
         #Building report tables
@@ -323,13 +329,13 @@ def superimposed_rocs(plot_data, title, axe, elec_count, colors=None,
                            k in plot_data[t]['scores'].keys()])
         i+=1
 
-    axe.legend(loc='lower right', prop={'size': 13})
+    axe.legend(loc='lower right', prop={'size': 8})
     info_text = 'Elec Count: {0}'.format(elec_count)
     plot_pse_text = True
     if len(pses) > 0 and plot_pse_text:
         info_text = info_text + '\nPSE:            {0}'.format(round(np.mean(pses), 2))
-    axe.text(0.03, 0.88, info_text, bbox=dict(facecolor='grey', alpha=0.5),
-             transform=axe.transAxes, fontsize=10)
+    axe.text(0.05, 0.85, info_text, bbox=dict(facecolor='grey', alpha=0.5),
+             transform=axe.transAxes, fontsize=8)
 
     columns = [title] + [k for k in ['ec', 'pse', 'pnee', 'AUC_ROC'] if
                          k in plot_data[t]['scores'].keys()] #Title here is the location
@@ -344,8 +350,8 @@ def superimposed_rocs(plot_data, title, axe, elec_count, colors=None,
 # Unique location info table
 def plot_score_in_loc_table(columns, rows, colors=None, saving_path=None):
     col_colors = [table_color_for(t) if colors is None else color_list[i] for
-                  i, t in enumerate(sorted([r[1] for r in rows]))] #cambiar
-    # el 1 por 0 para el 3
+                  i, t in enumerate(sorted([r[0] if r[0] in EVENT_TYPES else
+                                           r[1] for r in rows]))]
     #font_colors = ['black' if c != 'blue' else 'white' for c in col_colors]
     rows = sorted(rows, key=lambda x: x[0]) #Order by HFO type name
     fig = go.Figure(
@@ -362,17 +368,17 @@ def plot_score_in_loc_table(columns, rows, colors=None, saving_path=None):
             ))
         ])
     col_width = 100
-    row_height = 35
+    row_height = 50
     fig.update_layout(
         autosize=False,
         width=col_width*len(columns),
         height=row_height * (len(rows) + 1 ),
         margin=dict(
-            l=50,
-            r=50,
-            b=100,
-            t=100,
-            pad=4
+            l=20,
+            r=20,
+            b=20,
+            t=20,
+            pad=3
         ))
     orca_save(fig, saving_path)
     #fig.show()
@@ -425,10 +431,12 @@ def plot_pse_hfo_rate_auc_table(data_by_loc, saving_path):
                 align='left', font=dict(color='black', size=8)
             ))
         ])
+    col_width = 100
+    row_height = 50
     fig.update_layout(
         autosize=False,
-        width=500,
-        height=1300,
+        width=col_width * 7,
+        height=row_height * (len(rows) + 1),
         margin=dict(
             l=50,
             r=50,
@@ -921,7 +929,6 @@ def color_for(t):
     raise ValueError('graphics.color_for is undefined for type: {0}'.format(t))
 
 def table_color_for(t):
-    print('Table color for t {0}'.format(t))
     if t == 'HFOs':
         return 'blue'
     if t == 'RonO+RonS+Fast RonO+Fast RonS':

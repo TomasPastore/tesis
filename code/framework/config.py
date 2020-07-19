@@ -27,8 +27,8 @@ models_dic = {'XGBoost': xgboost,
 EVENT_TYPES = ['RonO', 'RonS', 'Spikes', 'Fast RonO', 'Fast RonS', 'Sharp '
                                                                    'Spikes']
 HFO_TYPES = ['Fast RonO', 'Fast RonS', 'RonO', 'RonS']
-HFO_SUBTYPES = ['slow', 'delta', 'theta', 'spindle',
-                'spike']  # confirmar ordenadas
+HFO_SUBTYPES = ['delta', 'theta', 'slow', 'spindle', 'spike']  # alpha, beta,
+# gamma.?
 
 electrodes_query_fields = ['patient_id', 'age', 'file_block', 'electrode',
                            'loc1', 'loc2', 'loc3', 'loc4', 'loc5',
@@ -103,7 +103,7 @@ experiment_default_path = str(Path(EXPERIMENTS_FOLDER, 'exp'))
 
 exp_save_path = dict()  # 7 'Experiments'
 
-exp_save_path[1] = str(Path(EXPERIMENTS_FOLDER, '1_global_data'))
+exp_save_path[1] = str(Path(EXPERIMENTS_FOLDER, '1_global_data')) #dir
 
 exp_save_path[2] = dict()
 exp_save_path[2]['dir'] = str(Path(EXPERIMENTS_FOLDER, '2_rate_soz_vs_nsoz'))
@@ -116,10 +116,11 @@ exp_save_path[3] = dict()
 exp_save_path[3]['dir'] = str(
     Path(EXPERIMENTS_FOLDER, '3_predicting_soz_with_rate'))
 exp_save_path[3]['0'] = str(Path(exp_save_path[3]['dir'],
-                                 '3_0_first_steps/hfos_and_spikes'))
+                                 '3_0_first_steps/hfos_and_spikes')) #path
 exp_save_path[3]['i'] = dict()
 exp_save_path[3]['i']['dir'] = str(Path(exp_save_path[3]['dir'],
                                         '3_i_whole_brain'))
+#change paths to dirs if we cange from whole brain to localized soz p version
 exp_save_path[3]['i']['a'] = str(Path(exp_save_path[3]['i']['dir'],
                                       '3_i_a_all_sleep_data/3_i_a_all_sleep_data'))
 exp_save_path[3]['i']['b'] = str(Path(exp_save_path[3]['i']['dir'],
@@ -127,10 +128,10 @@ exp_save_path[3]['i']['b'] = str(Path(exp_save_path[3]['i']['dir'],
 
 exp_save_path[3]['ii'] = dict()
 exp_save_path[3]['ii']['dir'] = str(Path(exp_save_path[3]['dir'],
-                                         '3_iii_pse_hfo_rate_auc_relation'))
+                                         '3_ii_pse_hfo_rate_auc_relation'))
 exp_save_path[3]['iii'] = dict()
 exp_save_path[3]['iii']['dir'] = str(Path(exp_save_path[3]['dir'],
-                                          '3_ii_localized'))
+                                          '3_iii_localized'))
 
 exp_save_path[4] = dict()
 exp_save_path[4]['dir'] = str(Path(EXPERIMENTS_FOLDER, '4_ml_hfo_classifiers'))

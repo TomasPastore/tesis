@@ -18,7 +18,7 @@ from config import (EVENT_TYPES, exp_save_path, TEST_BEFORE_RUN,
                     experiment_default_path,
                     intraop_patients, models_to_run)
 from db_parsing import Database, parse_patients, get_locations, \
-    get_granularity, encode_type_name, all_loc_names, load_patients, query_filters, \
+    get_granularity, encode_type_name, preference_locs, load_patients, query_filters, \
     all_subtype_names
 from metrics import print_metrics
 
@@ -74,14 +74,14 @@ def experiment_menu(exp_driver):
         exp_driver.run_experiment(number=2, roman_num='ii') #localized
         go_to_menu_after(5, exp_driver)
     elif option == 3:
-        exp_driver.run_experiment(number=3, roman_num='0') # whole brain HFOs
+        #exp_driver.run_experiment(number=3, roman_num='0') # whole brain HFOs
         # together
-        exp_driver.run_experiment(number=3, roman_num='i', letter='a') #whole
+        #exp_driver.run_experiment(number=3, roman_num='i', letter='a') #whole
         # brain untagged
-        exp_driver.run_experiment(number=3, roman_num='i', letter='b') #whole
+        #exp_driver.run_experiment(number=3, roman_num='i', letter='b') #whole
         # brain tagged
         exp_driver.run_experiment(number=3, roman_num='ii') # PSE AUC relation
-        exp_driver.run_experiment(number=3, roman_num='iii') #localized
+        #exp_driver.run_experiment(number=3, roman_num='iii') #localized
         go_to_menu_after(5, exp_driver)
 
     elif option == 4:

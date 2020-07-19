@@ -589,7 +589,7 @@ def parse_coord(param):  # -1 Represents empty, consider filtering
     return parsed_coord
 
 
-def ALL_loc_names(granularity): #all to test
+def all_loc_names(granularity): #all to test
     if granularity == 0:
         return ['Whole Brain']
     if granularity == 2:
@@ -637,39 +637,28 @@ def ALL_loc_names(granularity): #all to test
 
 
 # locations in MNI space loc1, loc2, loc3, loc4, loc5
-def all_loc_names(granularity):
+def preference_locs(granularity):
     if granularity == 0:
         return ['Whole Brain']
-    elif granularity == 1:
-        return ['Right Cerebrum', 'Left Cerebrum']
     elif granularity == 2:
-        return ['Frontal Lobe', 'Temporal Lobe', 'Parietal Lobe',
-                'Occipital Lobe', 'Limbic Lobe']
+        return ['Frontal Lobe', 'Temporal Lobe', 'Limbic Lobe',
+                'Parietal Lobe', 'Occipital Lobe', ]
     elif granularity == 3:
-        return ['Fusiform Gyrus', 'Parahippocampal Gyrus',
-                'Middle Temporal Gyrus', 'Postcentral Gyrus',
-                'Superior Frontal Gyrus', 'Inferior Frontal Gyrus',
-                'Middle Frontal Gyrus']
-        # all = ['Superior Occipital Gyrus', 'Superior Parietal
-        # Lobule', 'Extra-Nuclear', ]Tuber  _id:"Transverse Temporal Gyrus"
-        # Culmen  Cuneus _id:"Posterior Cingulate" Thalamus _id:"Lingual
-        # Gyrus" _id:"Middle Occipital Gyrus" Pyramis _id:"Subcallosal Gyrus"
-        # _id:"Anterior Cingulate" _id:"Superior Frontal Gyrus"
-        # _id:"Cingulate Gyrus" _id:"Lentiform Nucleus" Precuneus _id:"Inferior Temporal Gyrus"
-    elif granularity == 4:
-        return ['Gray Matter', 'White Matter']
+        return ['Parahippocampal Gyrus',
+                'Middle Temporal Gyrus', 'Superior Temporal Gyrus',
+                'Sub-Gyral', 'Uncus', 'Fusiform Gyrus']
     elif granularity == 5:
-        return ['Hippocampus', 'Amygdala', 'Brodmann area 21',
-                'Brodmann area 28',
-                'Brodmann area 34', 'Brodmann area 35', 'Brodmann area 36',
-                'Brodmann area 37']
-
+        return ['Hippocampus', 'Amygdala',
+                'Brodmann area 20', 'Brodmann area 21',
+                'Brodmann area 28', 'Brodmann area 36']
+    else:
+        raise NotImplementedError('Implement granularity locs')
 
 def get_granularity(loc):
     if loc == None or loc == 'Whole Brain':
         return 0
     for i in range(6):
-        if loc in ALL_loc_names(i):
+        if loc in all_loc_names(i):
             return i
     raise RuntimeError('Unknown location name: {0}'.format(loc))
 
@@ -681,7 +670,7 @@ def get_locations(loc_granularity, locations='all'):
         locations = ['Whole Brain']
     else:
         loc = 'loc{i}'.format(i=loc_granularity)
-        locations = all_loc_names(
+        locations = preference_locs(
             granularity=loc_granularity) if locations == 'all' else locations
     return loc, locations
 

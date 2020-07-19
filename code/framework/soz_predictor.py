@@ -11,8 +11,8 @@ from sklearn.metrics import roc_auc_score
 from config import (EVENT_TYPES, HFO_TYPES, exp_save_path,
                     experiment_default_path,
                     models_to_run)
-from db_parsing import get_granularity, ALL_loc_names, \
-    all_loc_names, load_patients
+from db_parsing import get_granularity, all_loc_names, \
+    preference_locs, load_patients
 
 running_py_3_5 = py_version[2] == '5'
 if running_py_3_5:
@@ -21,12 +21,12 @@ from utils import print_info, time_counter
 import graphics
 
 
-#Maybe this is not necesary having the localized verison review.
+# Maybe this is not necesary having the localized verison review.
 # 3) Predicting SOZ with rates: Baselines  #####################################
 # 3i
 # Make the ROC baselines for whole brain.
 # Returns the data for the ml and the data to plot the baselines
-#TODO pAUC
+# TODO pAUC
 def evt_rate_soz_pred_baseline_whole_brain(elec_collection, evt_collection,
                                            intraop=False,
                                            load_untagged_coords_from_db=True,
@@ -72,9 +72,8 @@ def evt_rate_soz_pred_baseline_whole_brain(elec_collection, evt_collection,
         print('Info data for Event types to compare...', file=file)
         for event_type_names in evt_types_to_cmp:
             type_group_name = '+'.join(event_type_names)
-            type_group_name = 'HFOs' if type_group_name == 'RonO+RonS+Fast ' \
-                                                           'RonO+Fast RonS' \
-                else type_group_name
+            type_group_name = 'HFOs' if type_group_name == '+'.join(
+                HFO_TYPES) else type_group_name
             print('\nInfo from: {n}'.format(n=type_group_name), file=file)
             event_type_data_by_loc[loc_name][type_group_name] = region_info(
                 patients_dic,
@@ -106,15 +105,16 @@ def pse_hfo_rate_auc_relation(elec_collection, evt_collection):
                                              restrict_to_tagged_locs=True,
                                              evt_types_to_load=HFO_TYPES,
                                              evt_types_to_cmp=[[t] for
-                                                             t in
-                                                             HFO_TYPES],
+                                                               t in
+                                                               HFO_TYPES],
                                              locations={
-                                               g: ALL_loc_names(g)
-                                               for g
-                                               in [2, 3, 5]},
+                                                 g: all_loc_names(g)
+                                                 for g
+                                                 in [2]},
                                              saving_dir=
-                                           exp_save_path[3]['ii'][
-                                               'dir'])
+                                             exp_save_path[3]['ii'][
+                                                 'dir'],
+                                             plot_rocs=False)
 
     graphics.plot_pse_hfo_rate_auc_table(data_by_loc, str(Path(exp_save_path[3][
                                                                    'ii']['dir'],
@@ -142,12 +142,13 @@ def evt_rate_soz_pred_baseline_localized(elec_collection,
                                                            t in
                                                            HFO_TYPES + [
                                                                'Spikes']],
-                                         locations={g: all_loc_names(g) for g
+                                         locations={g: preference_locs(g) for g
                                                     in [2, 3, 5]},
                                          saving_dir=
                                          exp_save_path[3]['iii']['dir'],
                                          models_to_run=models_to_run,
-                                         loc_pat_dic=None):
+                                         loc_pat_dic=None,
+                                         plot_rocs=True):
     print('SOZ predictor localized')
     print('Intraop: {intr}'.format(intr=intraop))
     print('load_untagged_coords_from_db: {0}'.format(
@@ -201,7 +202,8 @@ def evt_rate_soz_pred_baseline_localized(elec_collection,
             event_type_data_by_loc[loc_name] = dict()
             if local_filter:
                 whole_brain_name = first_key(patients_by_loc)
-                patients_dic = patients_by_loc[whole_brain_name]  # whole_brain_name
+                patients_dic = patients_by_loc[
+                    whole_brain_name]  # whole_brain_name
             else:
                 patients_dic = patients_by_loc[loc_name]
             # Create info header
@@ -226,42 +228,52 @@ def evt_rate_soz_pred_baseline_localized(elec_collection,
                     loc_info = region_info(patients_dic, event_type_names,
                                            location=loc_name if loc_name !=
                                                                 'Whole Brain'
-                    else None)
+                                           else None)
 
                     min_pat_count_in_location = 12
                     min_pat_with_epilepsy_in_location = 3
                     if loc_info['patient_count'] >= min_pat_count_in_location \
-                            and loc_info['patients_with_epilepsy'] >= min_pat_with_epilepsy_in_location:
+                            and loc_info[
+                        'patients_with_epilepsy'] >= min_pat_with_epilepsy_in_location:
                         print('Files_saving_path {0}'.format(file_saving_path))
 
                         if loc_name not in data_by_loc.keys():
                             data_by_loc[loc_name] = dict()
 
+                        # For ROCs plot
                         event_type_data_by_loc[loc_name][type_group_name] = \
                             loc_info
+
+                        # Generate de txt file with useful data
                         print_info(loc_info, file=file)
 
-                        # Data for 3.iii table
-                        data_by_loc[loc_name]['PSE'] = loc_info['pse']
-                        data_by_loc[loc_name][type_group_name + '_AUC'] = \
-                            loc_info['AUC_ROC']
+                        # For exp 2
                         data_by_loc[loc_name][type_group_name + '_rates'] = \
                             dict(soz=loc_info['soz_rates'], nsoz=loc_info[
                                 'nsoz_rates'])
+
+                        # For 3.ii table
+                        data_by_loc[loc_name]['PSE'] = loc_info['pse']
+                        data_by_loc[loc_name][type_group_name + '_AUC'] = \
+                            loc_info['AUC_ROC']
+
+                        # For saving a location dictionary
                         if loc_name == loc_pat_dic:
-                            data_by_loc[loc_pat_dic]['patients_dic']= \
+                            data_by_loc[loc_pat_dic]['patients_dic'] = \
                                 loc_info['patients_dic_in_loc']
 
                     else:
-                        print('Region and type excluded because lack of data --> {0} {1}'.format(loc_name, type_group_name))
-        '''
-        graphics.event_rate_by_loc(event_type_data_by_loc,
-                                   metrics=['pse', 'pnee', 'auc'],
-                                   roc_saving_path=str(Path(saving_path,
-                                    'loc_{g}'.format(g=granularity),
-                                    '3_iii_sleep_tagged')),
-                                   change_tab_path=True)
-        '''
+                        print(
+                            'Region and type excluded because lack of data --> {0} {1}'.format(
+                                loc_name, type_group_name))
+        if plot_rocs:
+            graphics.event_rate_by_loc(event_type_data_by_loc,
+                                       metrics=['pse', 'pnee', 'auc'],
+                                       roc_saving_path=str(Path(saving_dir,
+                                                                'loc_{g}'.format(
+                                                                    g=granularity),
+                                                                'rate_baseline')),
+                                       change_tab_path=True)
     return event_type_data_by_loc, data_by_loc
 
 
@@ -290,7 +302,7 @@ def region_info(patients_dic, event_types=EVENT_TYPES, flush=False,
     for p_name, p in patients_dic.items():
         if location is None:
             electrodes = p.electrodes
-            #pat_in_loc[p_name] = p
+            # pat_in_loc[p_name] = p
         else:
             electrodes = [e for e in p.electrodes if getattr(e,
                                                              'loc{i}'.format(i=
@@ -386,4 +398,3 @@ def region_info(patients_dic, event_types=EVENT_TYPES, flush=False,
 
 def first_key(dic):
     return [k for k in dic.keys()][0]
-
