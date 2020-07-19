@@ -151,25 +151,51 @@ def plot_types_feature_distribution(rates_by_type, feature, saving_dir):
     import seaborn as sns
     sns.set_style("white")
     # Plot
-    subplot_index = {'RonO': 1, 'RonS': 2, 'Fast Rono':3, 'Fast RonS':4}
+    subplot_index = {'RonO': 1, 'RonS': 2, 'Fast RonO':3, 'Fast RonS':4}
     kwargs = dict(hist_kws={'alpha': .6}, kde_kws={'linewidth': 2})
 
     fig = plt.figure(figsize=(10, 7), dpi=80)
     fig.suptitle('{feat} SOZ vs NSOZ distributions'.format(
         feat=feature.capitalize()),
         fontsize=20)
+    bins_by_t ={'RonO': 15, 'RonS': 5, 'Fast RonO':10, 'Fast RonS':3}
+
     for type in HFO_TYPES:
         axe = plt.subplot('{r}{c}{i}'.format(r=2, c=2, i=subplot_index[type]))
         axe.set_title(type, fontdict={'fontsize': 14}, loc='left')
-        #axe.set_xlim([0, 1])
-        #axe.set_ylim([0, 1])
         axe.set_xlabel(feature.capitalize(), fontdict={'fontsize': 12})
         axe.set_ylabel('Frequency', fontdict={'fontsize': 12})
-        sns.distplot(rates_by_type[type]['soz'], color="red",
+        soz_rates = rates_by_type[type]['soz']
+        nsoz_rates = rates_by_type[type]['nsoz']
+
+        sns.distplot(soz_rates, bins=bins_by_t[type], color="red",
                      label="SOZ", **kwargs)
-        sns.distplot(rates_by_type[type]['nsoz'], color="green",
+        sns.distplot(nsoz_rates, bins=bins_by_t[type], color="green",
                      label="NSOZ", **kwargs)
-        axe.legend(loc='lower right', prop={'size': 13})
+        #cuanto significa el valor en xlim index comparado con el resto
+        def pval_rate(data, xlim_index):
+            return len([r for r in data if r>= data[xlim_index] ])/len(data)
+
+        def get_xlim(data, pval=0.008):
+            data = sorted(data)
+            xlim_index = len(data)-1
+            while( pval_rate(data, xlim_index) <= pval): #si no tiene tantas
+                # obs no lo ploteo para mejorar la visualizacion con zoom.
+                xlim_index -= 1
+            return data[xlim_index]
+        xlim = min(get_xlim(soz_rates), get_xlim(nsoz_rates))
+        #axe.set_xlim([-2, xlim])
+
+        soz_max_rate = round(max(rates_by_type[type]['soz']), 2)
+        nsoz_max_rate = round(max(rates_by_type[type]['nsoz']), 2)
+        # For text block coords (0, 0) is bottom and (1, 1) is top
+        axe.text(x=0.65, #upper right
+                 y=0.75,
+                 s='Max elec rate\nsoz: {ms}\nnsoz: {mns}'.format(
+                      ms=soz_max_rate, mns=nsoz_max_rate),
+                  bbox=dict(facecolor='grey', alpha=0.5),
+                  transform=axe.transAxes, fontsize=10)
+        axe.legend(loc='lower right', prop={'size': 10})
     fig.savefig(fig_path)
     plt.close(fig)
     # plt.show()
@@ -317,8 +343,10 @@ def superimposed_rocs(plot_data, title, axe, elec_count, colors=None,
 # Reviewed
 # Unique location info table
 def plot_score_in_loc_table(columns, rows, colors=None, saving_path=None):
-    col_colors = [table_color_for(t) if colors is None else color_list[i] for i, t in enumerate(sorted([r[0] for r in rows]))]
-    font_colors = ['black' if c != 'blue' else 'white' for c in col_colors]
+    col_colors = [table_color_for(t) if colors is None else color_list[i] for
+                  i, t in enumerate(sorted([r[1] for r in rows]))] #cambiar
+    # el 1 por 0 para el 3
+    #font_colors = ['black' if c != 'blue' else 'white' for c in col_colors]
     rows = sorted(rows, key=lambda x: x[0]) #Order by HFO type name
     fig = go.Figure(
         data=[go.Table(
@@ -329,15 +357,16 @@ def plot_score_in_loc_table(columns, rows, colors=None, saving_path=None):
             ),
             cells=dict(
                 values=[[r[i] for r in rows] for i in range(len(columns))],
-                fill_color=[np.array(col_colors) for i in range(len(columns))],
-                align='left', font=dict(color=[font_colors for i in range(len(columns))], size=12)
+                line_color='black', fill_color='white',
+                align='right', font=dict(color='black', size=12)
             ))
         ])
-
+    col_width = 100
+    row_height = 35
     fig.update_layout(
         autosize=False,
-        width=500,
-        height=500,
+        width=col_width*len(columns),
+        height=row_height * (len(rows) + 1 ),
         margin=dict(
             l=50,
             r=50,
@@ -821,7 +850,7 @@ def boxplot_feature_distributions(feature_name, data):
     soz_data = data[feature_name]['soz']
     nsoz_data = data[feature_name]['n_soz']
 
-    ax.boxplot([soz_data, nsoz_data], labels=['SOZ', 'Non-SOZ'])
+    ax.boxplot([soz_data, nsoz_data], labels=['SOZ', 'NSOZ'])
     plt.ylabel(y_label)
     plt.title('Hippocampal RonO {0} distribution'.format(feature_name))
     plt.savefig("/home/tpastore/Box_plot_Hippocampal_RonO_{0}.eps".format(feature_name), bbox_inches='tight')
@@ -864,6 +893,8 @@ def color_for(t):
         return 'b'
     if t == 'RonO+RonS+Fast RonO+Fast RonS':
         return 'b'
+    if t == 'Fast RonO+Fast RonS+RonO+RonS':
+        return 'b'
     if t == 'RonO':
         return 'b'
     if t == 'RonS':
@@ -890,6 +921,7 @@ def color_for(t):
     raise ValueError('graphics.color_for is undefined for type: {0}'.format(t))
 
 def table_color_for(t):
+    print('Table color for t {0}'.format(t))
     if t == 'HFOs':
         return 'blue'
     if t == 'RonO+RonS+Fast RonO+Fast RonS':
@@ -916,7 +948,10 @@ def table_color_for(t):
         return 'darkviolet'
     if t == 'Filtered Fast RonS':
         return 'gold'
-    raise ValueError('graphics.table_color_for is undefined for type: {0}'.format(t))
+    else:
+        return 'white'
+        #raise ValueError('graphics.table_color_for is undefined for type: {
+        # 0}'.format(t))
 
 def color_for_scatter(granularity, type, hip=False):
     color_by_type = {

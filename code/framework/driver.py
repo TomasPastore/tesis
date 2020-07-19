@@ -26,10 +26,10 @@ class Driver():
         self.elec_collection = elec_collection
         self.evt_collection = evt_collection
 
-    def run_experiment(self, number, roman_num, letter):
+    def run_experiment(self, number, roman_num=None, letter=None):
         NOT_IMPLEMENTED_EXP = NotImplementedError('Not implemented experiment')
         if number == 1:
-            print('Running exp 1) Data Global analysis')
+            print('\nRunning exp 1) Data Global analysis')
 
             scratch.print_non_intraop_patients(self.elec_collection,
                                                self.evt_collection)
@@ -61,9 +61,8 @@ class Driver():
                                                  Path(exp_save_path[1],
                                                       'localized_table')))
         elif number == 2:
-            # TODO Pasar figuras a informe
             if roman_num == 'i':
-                print('Running exp 2.i) HFO rate in SOZ vs NSOZ in Whole brain')
+                print('\nRunning exp 2.i) HFO rate in SOZ vs NSOZ in Whole brain')
                 location = 'Whole Brain'
                 event_type_data_by_loc, \
                 data_by_loc = evt_rate_soz_pred_baseline_localized(
@@ -99,7 +98,7 @@ class Driver():
                                              'stats_table'))
                 )
             elif roman_num == 'ii':
-                print('Running exp 2.ii) HFO rate in SOZ vs NSOZ localized')
+                print('\nRunning exp 2.ii) HFO rate in SOZ vs NSOZ localized')
                 def ba(id):
                     return 'Brodmann area {id}'.format(id=id)
 
@@ -164,7 +163,7 @@ class Driver():
             # TODO add to overleaf
             # TODO change for localized version
             if roman_num == '0':
-                print('Running exp 3.0) Predicting SOZ with rates: Baselines '
+                print('\nRunning exp 3.0) Predicting SOZ with rates: Baselines '
                       '(first steps)')
                 evt_rate_soz_pred_baseline_whole_brain(self.elec_collection,
                                                        self.evt_collection,
@@ -181,7 +180,7 @@ class Driver():
             elif roman_num == 'i':
                 # TODO add to overleaf
                 if letter == 'a':
-                    print('Running exp 3.i.a) Predicting SOZ with rates: '
+                    print('\nRunning exp 3.i.a) Predicting SOZ with rates: '
                           'Baselines (Whole brain coords untagged)')
                     # TODO change for localized version
 
@@ -204,7 +203,7 @@ class Driver():
                                                            exp_save_path[
                                                                3]['i']['a'])
                 elif letter == 'b':
-                    print('Running exp 3.i.b) Predicting SOZ with rates: '
+                    print('\nRunning exp 3.i.b) Predicting SOZ with rates: '
                           'Baselines (Whole brain coords tagged)')
                     # Mb) 57 patients with tagged coords.
                     # NOTE: V0_ if you just dont load untagged coords from db,
@@ -232,12 +231,12 @@ class Driver():
                 else:  # letter
                     raise NOT_IMPLEMENTED_EXP
             elif roman_num == 'ii':
-                print('Running exp 3.ii: Ranking table of AUC baselines. '
+                print('\nRunning exp 3.ii: Ranking table of AUC baselines. '
                       'Proportion of soz electrodes AUC relation')
                 pse_hfo_rate_auc_relation(self.elec_collection,
                                           self.evt_collection)
             elif roman_num == 'iii':
-                print('Running exp 3.iii. Predicting SOZ with rates: '
+                print('\nRunning exp 3.iii. Predicting SOZ with rates: '
                       'Baselines (Localized x,y,z and loc tagged)')
                 def test_localized_time():
                     evt_rate_soz_pred_baseline_localized(self.elec_collection,
@@ -270,7 +269,8 @@ class Driver():
             # 4) ML HFO classifiers para extremos de 3 iii
             if roman_num == 'i':
                 if letter == 'a':
-                    # Whole brain without x, y, z in ml
+                    print('\nRunning exp 4.i.a) ML HFO classifier for Whole '
+                          'Brain with coords untagged')
                     saving_dir = exp_save_path[4]['i']['a']  # dir
                     saving_path = str(Path(saving_dir, 'untagged'))
                     baselines_data, patients_dic = evt_rate_soz_pred_baseline_whole_brain(
@@ -306,6 +306,8 @@ class Driver():
                                                               hfo_type)))
 
                 elif letter == 'b':
+                    print('\nRunning exp 4.i.b) ML HFO classifier for Whole '
+                          'Brain with coords tagged')
                     # Whole brain with x, y, z in ml
                     saving_dir = exp_save_path[4]['i']['b']  # dir
                     saving_path = str(Path(saving_dir, 'tagged'))
@@ -343,6 +345,9 @@ class Driver():
                                                               hfo_type)))
             elif roman_num == 'ii':
                 if letter == 'a':
+                    print('\nRunning exp 4.ii a) ML HFO classifier in '
+                          'Hippocampus. Tagged but without using x, y, '
+                          'z in ml because of epilepsy localization bias.')
                     # Localized: Hippocampus
                     saving_dir = exp_save_path[4]['ii']['Hippocampus']  # dir
                     baselines_data, data_by_loc = \

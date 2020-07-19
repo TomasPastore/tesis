@@ -37,9 +37,10 @@ def hfo_rate_statistical_tests(rates_by_type, types=HFO_TYPES,
         else:
             for s_name, test_f in test_func.items():
                 stats[feat_name][t][test_names[s_name]] = dict()
-                stats[feat_name][t][test_names[s_name]][s_name], \
-                stats[feat_name][t][test_names[s_name]]['pval'] = \
-                    test_f(data_soz, data_nsoz)
+                S, pval = test_f(data_soz, data_nsoz)
+                stats[feat_name][t][test_names[s_name]][s_name] = round(S,2)
+                stats[feat_name][t][test_names[s_name]]['pval'] = format(
+                    pval,'.2e')
             '''
             graphics.plot_feature_distribution(data_soz,
                                                data_nsoz,
