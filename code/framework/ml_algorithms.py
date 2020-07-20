@@ -1,3 +1,6 @@
+import getpass
+
+import pydot
 from sklearn.calibration import CalibratedClassifierCV
 from sklearn.ensemble import RandomForestClassifier
 from imblearn.ensemble import BalancedRandomForestClassifier
@@ -6,8 +9,10 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.naive_bayes import GaussianNB
 from sklearn.svm import LinearSVC
 from sklearn.linear_model import SGDClassifier
+from sklearn.tree import export_graphviz
 from xgboost.sklearn import XGBClassifier
 from random import random, choices
+import pandas as pd
 
 
 # Machine learning sklearn algorithms
@@ -159,3 +164,31 @@ def simulator(test_labels, distr, confidence):
         simulated_preds.append(pred)
         simulated_probs.append(prob)
     return simulated_preds, simulated_probs
+
+def print_feature_importances(model, feature_names):
+    # Extract feature importances
+    fi = pd.DataFrame({'feature': feature_names,
+                       'importance': model.feature_importances_}). \
+        sort_values('importance', ascending=False)
+
+    print(fi)
+
+
+
+def generate_trees(feature_list, train_features, train_labels,
+                   amount=1, directory='/home/{user}'.format(user=getpass.getuser())):
+    # Limit depth of tree to 3 levels
+    rf_small = RandomForestClassifier(n_estimators=amount, max_depth=4)
+    rf_small.fit(train_features, train_labels)
+    for i in range(amount):
+        # Extract the small tree
+        tree_small = rf_small.estimators_[i]
+        # Save the tree as a png image
+        out_path = '{dir}/thesis_tree_{k}.dot'.format(dir=directory, k=i)
+        export_graphviz(tree_small,
+                        out_file=out_path,
+                        feature_names=feature_list,
+                        rounded=True,
+                        precision=1)
+        (graph,) = pydot.graph_from_dot_file(out_path)
+        graph.write_png('{dir}/thesis_tree_{k}.png'.format(dir=directory, k=i))

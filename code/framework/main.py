@@ -20,7 +20,6 @@ from config import (EVENT_TYPES, exp_save_path, TEST_BEFORE_RUN,
 from db_parsing import Database, parse_patients, get_locations, \
     get_granularity, encode_type_name, preference_locs, load_patients, query_filters, \
     all_subtype_names
-from metrics import print_metrics
 
 running_py_3_5 = py_version[2] == '5'
 if running_py_3_5:
@@ -50,7 +49,7 @@ def main(interactive_exp_menu=False):
             unittest.main(tests, exit=False)
 
         # Experiment list for the driver:
-        exp_driver.run_experiment( number=2, roman_num='ii', letter='a')
+        exp_driver.run_experiment( number=3, roman_num='ii', letter='a')
 
 
 def experiment_menu(exp_driver):
@@ -122,4 +121,4 @@ def go_to_menu_after(seconds, exp_driver):
     experiment_menu(exp_driver)
 
 if __name__ == "__main__":
-    main(interactive_exp_menu=True)
+    main(interactive_exp_menu=False)

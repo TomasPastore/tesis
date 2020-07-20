@@ -428,11 +428,11 @@ def plot_pse_hfo_rate_auc_table(data_by_loc, saving_path):
             cells=dict(
                 values=[[r[i] for r in rows] for i in range(7)],
                 fill_color=[np.array(col_colors) for i in range(7)],
-                align='left', font=dict(color='black', size=8)
+                align='left', font=dict(color='black', size=10)
             ))
         ])
-    col_width = 100
-    row_height = 50
+    col_width = 90
+    row_height = 70
     fig.update_layout(
         autosize=False,
         width=col_width * 7,
