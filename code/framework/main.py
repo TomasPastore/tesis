@@ -49,7 +49,7 @@ def main(interactive_exp_menu=False):
             unittest.main(tests, exit=False)
 
         # Experiment list for the driver:
-        exp_driver.run_experiment( number=3, roman_num='ii', letter='a')
+        exp_driver.run_experiment( number=3, roman_num='iii', letter='a')
 
 
 def experiment_menu(exp_driver):
@@ -63,6 +63,7 @@ def experiment_menu(exp_driver):
     print('6) Simulator')
     print('7) Exit')
     option = int(input('Choose a number from the options above: '))
+
     if option == 1:
         exp_driver.run_experiment(number=1) # intraop and dimensions in
         # localized and whole brain regions
@@ -73,14 +74,14 @@ def experiment_menu(exp_driver):
         exp_driver.run_experiment(number=2, roman_num='ii') #localized
         go_to_menu_after(5, exp_driver)
     elif option == 3:
-        #exp_driver.run_experiment(number=3, roman_num='0') # whole brain HFOs
+        exp_driver.run_experiment(number=3, roman_num='0') # whole brain HFOs
         # together
-        #exp_driver.run_experiment(number=3, roman_num='i', letter='a') #whole
+        exp_driver.run_experiment(number=3, roman_num='i', letter='a') #whole
         # brain untagged
-        #exp_driver.run_experiment(number=3, roman_num='i', letter='b') #whole
+        exp_driver.run_experiment(number=3, roman_num='i', letter='b') #whole
         # brain tagged
         exp_driver.run_experiment(number=3, roman_num='ii') # PSE AUC relation
-        #exp_driver.run_experiment(number=3, roman_num='iii') #localized
+        exp_driver.run_experiment(number=3, roman_num='iii') # localized
         go_to_menu_after(5, exp_driver)
 
     elif option == 4:
@@ -105,7 +106,8 @@ def experiment_menu(exp_driver):
     elif option == 7:
         sys.exit()
     else:
-        raise NotImplementedError('Future work?')
+        raise NotImplementedError('Option {0} was left as future '
+                                  'work.'.format(option))
 
 def clear_screen():
     if os.name == 'nt':

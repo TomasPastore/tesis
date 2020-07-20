@@ -7,7 +7,7 @@ from patient import Patient
 warnings.filterwarnings("ignore", module="matplotlib")
 warnings.simplefilter(action='ignore', category=FutureWarning)
 import numpy as np
-from sklearn.metrics import roc_auc_score, roc_curve
+from sklearn.metrics import roc_auc_score, roc_curve, auc
 from config import (EVENT_TYPES, HFO_TYPES, exp_save_path,
                     experiment_default_path,
                     models_to_run)
@@ -110,7 +110,7 @@ def pse_hfo_rate_auc_relation(elec_collection, evt_collection):
                                              locations={
                                                  g: all_loc_names(g)
                                                  for g
-                                                 in [2]},
+                                                 in [2,3,5]},
                                              saving_dir=
                                              exp_save_path[3]['ii'][
                                                  'dir'],

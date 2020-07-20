@@ -398,21 +398,24 @@ def plot_pse_hfo_rate_auc_table(data_by_loc, saving_path):
         sorted_types = sorted(HFO_TYPES)
         for type in sorted_types:
             row.append(round( data[type+'_AUC'], 2))
-        row.append(max(row[3:7])) # row = ['g','l','p','t1','t2','t3', 't4']
+        row.append(max(row[3:7])) # row = 3:7 ['g','l','p','t1','t2','t3',
+        # 't4', 'max_auc_ti']
         rows.append(tuple(row))
 
     # Order by granularity, loc_name
     #rows = sorted(rows, key=lambda x: (x[0], x[1]))
 
     # Rank by AUC
-    rows = sorted(rows, key=lambda x: x[7])
+    rows = sorted(rows, reverse=True, key=lambda x: x[-1]) #orders by last row
+    # element,
+    # which is the maxs AUC of the 4 types
 
     for row in rows:
         col_colors.append(color_by_gran(row[0]))
 
     fig = go.Figure(
         data=[go.Table(
-            columnwidth=[300, 500, 200, 200, 200, 200, 200],
+            columnwidth=[100, 200, 100, 100, 100, 100, 100],
             header=dict(
                 values=['{b}Granularity{b}'.format(b='<b>'),
                         '{b}Location{b}'.format(b='<b>'),
@@ -426,17 +429,17 @@ def plot_pse_hfo_rate_auc_table(data_by_loc, saving_path):
                 align='left', font=dict(color='black', size=10)
             ),
             cells=dict(
-                values=[[r[i] for r in rows] for i in range(7)],
-                fill_color=[np.array(col_colors) for i in range(7)],
+                values=[[r[i] for r in rows] for i in range(len(rows[0])-1)],
+                fill_color=[np.array(col_colors) for i in range(len(rows[0])-1)],
                 align='left', font=dict(color='black', size=10)
             ))
         ])
     col_width = 90
-    row_height = 70
+    row_height = 50
     fig.update_layout(
         autosize=False,
         width=col_width * 7,
-        height=row_height * (len(rows) + 1),
+        #height=row_height * (len(rows) + 1),
         margin=dict(
             l=50,
             r=50,
