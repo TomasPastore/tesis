@@ -97,8 +97,8 @@ hip_rons_validation_names = ['3997', 'IO001', '463', '4099', '466', 'IO025',
 color_list = ['blue', 'green', 'magenta', 'yellow', 'lightcyan', 'black',
               'mediumslateblue', 'lime', 'darkviolet', 'gold']
 
-EXPERIMENTS_FOLDER = str(Path(
-    '~/Documentos/lic_computacion/tesis/experiments/').expanduser().resolve())
+TESIS_ROOT_DIR = Path('~/Documentos/lic_computacion/tesis').expanduser().resolve()
+EXPERIMENTS_FOLDER = str(Path( TESIS_ROOT_DIR,'experiments/'))
 experiment_default_path = str(Path(EXPERIMENTS_FOLDER, 'exp'))
 
 exp_save_path = dict()  # 7 'Experiments'
@@ -107,8 +107,13 @@ exp_save_path[1] = str(Path(EXPERIMENTS_FOLDER, '1_global_data')) #dir
 
 exp_save_path[2] = dict()
 exp_save_path[2]['dir'] = str(Path(EXPERIMENTS_FOLDER, '2_rate_soz_vs_nsoz'))
-exp_save_path[2]['i'] = str(
-    Path(exp_save_path[2]['dir'], '2_i_whole_brain')) #dir
+exp_save_path[2]['i'] = dict()
+exp_save_path[2]['i']['a'] = str(Path(exp_save_path[2]['dir'],
+                                      '2_i_whole_brain',
+                                      'untagged')) #dir
+exp_save_path[2]['i']['b'] = str(Path(exp_save_path[2]['dir'],
+                                      '2_i_whole_brain',
+                                      'tagged')) #dir
 exp_save_path[2]['ii'] = str(Path(exp_save_path[2]['dir'],
                                   '2_ii_localized'))  #dir
 
@@ -120,11 +125,10 @@ exp_save_path[3]['0'] = str(Path(exp_save_path[3]['dir'],
 exp_save_path[3]['i'] = dict()
 exp_save_path[3]['i']['dir'] = str(Path(exp_save_path[3]['dir'],
                                         '3_i_whole_brain'))
-#change paths to dirs if we cange from whole brain to localized soz p version
 exp_save_path[3]['i']['a'] = str(Path(exp_save_path[3]['i']['dir'],
-                                      '3_i_a_all_sleep_data/3_i_a_all_sleep_data'))
+                                      '3_i_a_all_sleep_data')) #dir
 exp_save_path[3]['i']['b'] = str(Path(exp_save_path[3]['i']['dir'],
-                                      '3_i_b_sleep_with_tagged_coords/3_i_b_sleep_with_tagged_coords'))
+                                      '3_i_b_sleep_with_tagged_coords')) #dir
 
 exp_save_path[3]['ii'] = dict()
 exp_save_path[3]['ii']['dir'] = str(Path(exp_save_path[3]['dir'],
@@ -136,8 +140,9 @@ exp_save_path[3]['iii']['dir'] = str(Path(exp_save_path[3]['dir'],
 exp_save_path[4] = dict()
 exp_save_path[4]['dir'] = str(Path(EXPERIMENTS_FOLDER, '4_ml_hfo_classifiers'))
 
-VALIDATION_NAMES_BY_LOC_PATH = str(Path(exp_save_path[4]['dir'],
-                                        'validations_names_by_loc'))
+VALIDATION_NAMES_BY_LOC_PATH = str( Path(TESIS_ROOT_DIR,
+                                         'code/framework',
+                                         'validation_names_by_loc.json'))
 exp_save_path[4]['i'] = dict()
 exp_save_path[4]['i']['a'] = str(Path(exp_save_path[4]['dir'],
                                       '4_i_whole_brain/4_i_a_coords_untag')) #dir

@@ -66,11 +66,21 @@ def load_patients(electrodes_collection, evt_collection, intraop,
                                                  projection=electrodes_query_fields)
         hfo_cursor = evt_collection.find(evt_filter,
                                          projection=hfo_query_fields)
-        patients_by_loc[loc_name] = parse_patients(elec_cursor, hfo_cursor,
+        patients_dic = parse_patients(elec_cursor, hfo_cursor,
                                                    event_type_names,
                                                    models_to_run,
                                                    restrict_to_tagged_coords,
                                                    restrict_to_tagged_locs)
+        remove_elec_artifacts = False #TODO extraer a parametro
+        if loc_name == 'Whole Brain' and remove_elec_artifacts:
+            print('\nK means filter for FronO and RonO electrical '
+                  'artifacts')
+            from ml_hfo_classifier import k_means_filter
+
+            for hfo_type in ['RonO', 'Fast RonO']:
+                patients_dic = k_means_filter(hfo_type, patients_dic)
+
+        patients_by_loc[loc_name] = patients_dic
 
     return patients_by_loc
 
@@ -646,11 +656,14 @@ def preference_locs(granularity):
     elif granularity == 3:
         return ['Parahippocampal Gyrus',
                 'Middle Temporal Gyrus', 'Superior Temporal Gyrus',
-                'Sub-Gyral', 'Uncus', 'Fusiform Gyrus']
+                'Sub-Gyral', 'Uncus', 'Fusiform Gyrus'] #el sup frontal tiene
+        # 4 pat soz nada mas
     elif granularity == 5:
         return ['Hippocampus', 'Amygdala',
                 'Brodmann area 20', 'Brodmann area 21',
-                'Brodmann area 28', 'Brodmann area 36']
+                'Brodmann area 28', 'Brodmann area 36'] # BA 6 BA35 #21 y 28
+        # dan bajo AUC, 20 0.74 con RonS, la 35 vale la pena para RonS FRonS
+        # 0.78 y 0.79
     else:
         raise NotImplementedError('Implement granularity locs')
 

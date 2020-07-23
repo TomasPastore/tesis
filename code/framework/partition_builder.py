@@ -1,5 +1,6 @@
 import math as mt
 import random
+import progressbar
 
 import numpy as np
 import pandas as pd
@@ -12,16 +13,12 @@ from utils import load_json, save_json
 from config import VALIDATION_NAMES_BY_LOC_PATH
 
 
-# Todo create partitionBuilder class in ml module
-
 # Reviewed
-def build_patient_sets(target_patients_id, hfo_type_name, patients_dic,
-                       location):
+def build_patient_sets(target_patients_id, patients_dic, location):
     '''
 
 
     :param target_patients_id: 'ALL', 'MODEL_PATIENTS', 'VALIDAION_PATIENTS'
-    :param hfo_type_name: as name says
     :param patients_dic: pname, Patient
     :param location: location name to do ml
     :return:
@@ -60,7 +57,10 @@ def build_patient_sets(target_patients_id, hfo_type_name, patients_dic,
         # For model validation
         target_patients = validation_patients
         test_partition = [[p.id for p in validation_patients]]
-
+    else:
+        raise ValueError('target_patients_id must be in ALL, MODEL_PATIENTS, '
+                         'VALIDATION_PATIENTS and was found to be {'
+                         '0}'.format(target_patients_id))
     return model_patients, target_patients, test_partition
 
 
@@ -104,10 +104,11 @@ def pull_apart_validation_set(patients_dic, location, val_size=0.3):
 
     else:
         validation_names = names_by_loc[location]
-    print('Validation patient names in {l}'.format(l=location,
+    print('Validation patient names in {l}: {v}'.format(l=location,
                                                    v=validation_names))
     model_patients = [p for p_name, p in patients_dic.items() if p_name not
                       in validation_names]
+    print('Model patients {p}'.format(p=model_patients))
     validation_patients = [p for p_name, p in patients_dic.items() if p_name
                            in validation_names]
 
@@ -125,10 +126,14 @@ def get_k_fold_random_partition(target_patients, K):
 
 
 # Reviewed
-# Creates N lists of indexes refering patients in target_pat to test in a
-# iteration. test_size is the proportion of target patients to test in each iter
-# returns as list of lists of patient names
 def get_N_fold_bootstrapping_partition(target_patients, N, test_size=0.3):
+    '''
+    :param target_patients: lists of patients to build train-test folds
+    :param N: amount of folds, iterations of cross validation
+    :param test_size: proportion of patients for testing each iteration
+    :return: N lists of patient names in target_pat to test in a
+    # iteration.
+    '''
     partition_names = []
     idx = list(range(len(target_patients)))  # [0,1,2...len-1]
     # Mezcla N veces y forma una lista con los primeros len(patients) *
@@ -151,9 +156,13 @@ def build_folds(hfo_type_name, model_patients, target_patients, test_partition):
     field_names = ml_field_names(hfo_type_name)
     fold = 0
     folds = []
+    bar = progressbar.ProgressBar(maxval=len(test_partition),
+                                  widgets=[progressbar.Bar('=', '[', ']'), ' ',
+                                           progressbar.Percentage()])
+    bar.start()
     for p_names in test_partition:  # p_names es una lista de pacientes en test
         fold += 1
-        print('Building fold {f}...'.format(f=fold))
+        bar.update(fold)
         train_patients = [p for p in model_patients if p.id not in p_names]
         # Los pacientes a testear estan en el orden de p_names
         test_patients = [target_patients_dic[name] for name in p_names]
@@ -195,6 +204,7 @@ def build_folds(hfo_type_name, model_patients, target_patients, test_partition):
             'target_pat_idx': target_pat_idx,
             'feature_names': feature_names
         })
+    bar.finish()
     return folds
 
 
@@ -204,15 +214,15 @@ def ml_field_names(hfo_type_name, include_coords=False):
         field_names = ['duration',
                        'power_av',
                        'freq_av',
-                       'slow_angle',
-                       'delta_angle',
-                       'theta_angle',
-                       'spindle_angle']
+                      ] # 'slow_angle',
+                       #'delta_angle',
+                       #'theta_angle',
+                       #'spindle_angle'
     else:
         field_names = ['duration',
-                       'power_pk', 'power_av',
-                       'freq_pk', 'freq_av',
-                       'spike_angle']
+                       'power_av',
+                       'freq_av',
+                      ] #'spike_angle', 'freq_pk',   'power_pk'
     if include_coords:
         for c in ['x', 'y', 'z']:
             field_names.append(c)
@@ -222,24 +232,41 @@ def ml_field_names(hfo_type_name, include_coords=False):
 
 # TODO probar la varianza o mean del feature en el electrodo como nuevo feature
 def get_features_and_labels(patients, hfo_type_name, field_names):
+    pac = [f for f in field_names if 'angle' in f or 'vs' in f]
     features = []
     labels = []
     for p in patients:
         for e in p.electrodes:
             for h in e.events[hfo_type_name]:
-                feature_row_i = {}
-                for feature_name in field_names:
-                    if 'angle' in feature_name or 'vs' in feature_name:
-                        feature_row_i['SIN({0})'.format(feature_name)] = mt.sin(
-                            h.info[feature_name])
-                        feature_row_i['COS({0})'.format(feature_name)] = mt.cos(
-                            h.info[feature_name])
-                    else:
-                        feature_row_i[feature_name] = h.info[feature_name]
-                features.append(feature_row_i)
-                labels.append(h.info['soz'])
+                if all([isinstance(h.info[f], float) for f in pac]): #I use
+                    # this event only if all the pac is not null, else skip,
+                    # if you don't use any '_angle' or 'vs' PAC property this takes
+                    # every event
+                    feature_row_i = {}
+                    for feature_name in field_names:
+                        if 'angle' in feature_name or 'vs' in feature_name:
+                            feature_row_i['SIN({0})'.format(feature_name)] = mt.sin(
+                                h.info[feature_name])
+                            feature_row_i['COS({0})'.format(feature_name)] = mt.cos(
+                                h.info[feature_name])
+                        else:
+                            feature_row_i[feature_name] = h.info[feature_name]
+                    features.append(feature_row_i)
+                    labels.append(h.info['soz'])
 
     return features, np.array(labels)  # returns dict, np.array, list
+
+# Reviewed
+def patients_with_more_than(count, patients_dic, hfo_type_name):
+    with_hfos = dict()
+    without_hfos = dict()
+    for p_name, p in patients_dic.items():
+        if sum([len(e.events[hfo_type_name]) for e in
+                p.electrodes]) > count:  # if has more than count hfos passes
+            with_hfos[p_name] = p
+        else:
+            without_hfos[p_name] = p
+    return with_hfos, without_hfos
 
 
 # Reviewed
@@ -275,15 +302,3 @@ def balance_samples(features, labels):
     print('{0} instances after SMOTE...'.format(post_count))
     return features, labels
 
-
-# Reviewed
-def patients_with_more_than(count, patients_dic, hfo_type_name):
-    with_hfos = dict()
-    without_hfos = dict()
-    for p_name, p in patients_dic.items():
-        if sum([len(e.events[hfo_type_name]) for e in
-                p.electrodes]) > count:  # if has more than count hfos passes
-            with_hfos[p_name] = p
-        else:
-            without_hfos[p_name] = p
-    return with_hfos, without_hfos

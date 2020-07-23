@@ -2,10 +2,10 @@ import copy
 
 import numpy as np
 from sklearn.metrics import roc_curve
-
+import progressbar
 import graphics
 from config import models_dic
-from graphics import ml_training_plot
+from sklearn.metrics import confusion_matrix, classification_report
 
 from partition_builder import patients_with_more_than, build_patient_sets, \
     build_folds
@@ -23,7 +23,7 @@ def compare_baseline_vs_ml(patients_dic, #Patients that built the baseline
                            location, #loc name
                            hfo_type, #hfo type name
                            use_coords,
-                           target_patients_id=['model_patients'],
+                           target_patients_id='MODEL_PATIENTS',
                            ml_models=['XGBoost'],
                            tol_fprs=[0.6], #HFO filter thresh to discard
                            # fisiological hfos below the proba thresh associate
@@ -95,7 +95,7 @@ def compare_baseline_vs_ml(patients_dic, #Patients that built the baseline
 
 # Reviewed
 def ml_hfo_classifier(patients_dic, location, hfo_type, use_coords,
-                      target_patients_id=['model_patients'],
+                      target_patients_id='MODEL_PATIENTS',
                       ml_models= ['XGBoost'],
                       sim_recall=None,
                       saving_dir=None):
@@ -120,8 +120,8 @@ def ml_hfo_classifier(patients_dic, location, hfo_type, use_coords,
     '''
     print('ML HFO classifier for location: '
           '{l} and type: {t}'.format(l=location, t=hfo_type))
-
-
+    print('target_patients_id: {t}'.format(t=target_patients_id))
+    print('saving_dir: {0}'.format(saving_dir))
     # This is if we want to exclude from ml analysis the patients that have
     # less than N events so their electrode rates will remain unchanged
     quantiles_dic = hfo_count_quantiles(patients_dic, hfo_type)
@@ -133,7 +133,7 @@ def ml_hfo_classifier(patients_dic, location, hfo_type, use_coords,
                                                            )
 
     model_patients, target_patients, test_partition = build_patient_sets(
-        target_patients_id, hfo_type, enough_hfo_pat)
+        target_patients_id, enough_hfo_pat, location)
 
     folds = build_folds(hfo_type, model_patients,
                         target_patients, test_partition)
@@ -141,10 +141,9 @@ def ml_hfo_classifier(patients_dic, location, hfo_type, use_coords,
     predict_folds(folds, target_patients, hfo_type,
                   models=ml_models, sim_recall=sim_recall)
 
-    plot = ml_training_plot(folds, location, hfo_type, roc=True,
-                            pre_rec=True, models_to_run=ml_models,
-                            saving_dir=saving_dir)
-
+    plot = graphics.ml_training_plot(target_patients, location, hfo_type, roc=True,
+                                     pre_rec=True, models_to_run=ml_models,
+                                     saving_dir=saving_dir)
     # Esto incluye a los excluidos por cuantil con todos sus eventos sin filtro
     for pat_id, p in excluded_pat.items():
         for e in p.electrodes:
@@ -160,12 +159,16 @@ def ml_hfo_classifier(patients_dic, location, hfo_type, use_coords,
 # Saves the results of each model in target patients info dic
 def predict_folds(folds, target_patients, hfo_type_name, models,
                   sim_recall=0.7):
-    for model_name in models:
+    for model_name in [m for m in models if m != 'Simulator']:
         print('Predicting folds for model {0}'.format(model_name))
+        bar = progressbar.ProgressBar(maxval=len(folds),
+                                      widgets=[progressbar.Bar('=', '[', ']'),
+                                               ' ',
+                                               progressbar.Percentage()])
+        bar.start()
         model_func = models_dic[model_name]
-        for fold in folds:
-            if model_name == 'Simulator':
-                continue # Necesito primero los otros para estimar el simulador
+        for fold_i, fold in enumerate(folds):
+            fold_i += 1 #enumerate starts at 0 but I want update bar from 1
             clf_preds, clf_probs, clf = model_func(fold['train_features'],
                                                    fold['train_labels'],
                                                    fold['test_features'],
@@ -179,6 +182,8 @@ def predict_folds(folds, target_patients, hfo_type_name, models,
                             fold['target_pat_idx'],
                             fold['test_labels'], hfo_type_name,
                             model=model_name)
+            bar.update(fold_i)
+        bar.finish()
 
     # Generate distr for simulator
     if 'Simulator' in models:
@@ -208,8 +213,15 @@ def predict_folds(folds, target_patients, hfo_type_name, models,
                            x_label='SOZ Probability', bins=None)
         '''
         model_name = 'Simulator'
+        print('Predicting folds for model {0}'.format(model_name))
+        bar = progressbar.ProgressBar(maxval=len(folds),
+                                      widgets=[progressbar.Bar('=', '[', ']'),
+                                               ' ',
+                                               progressbar.Percentage()])
+        bar.start()
         simulator_func = models_dic['Simulator']
-        for fold in folds:
+        for fold_i, fold in enumerate(folds):
+            fold_i += 1
             clf_preds, clf_probs = simulator_func(fold['test_labels'],
                                                 distr=distr,
                                               confidence=sim_recall)
@@ -221,7 +233,8 @@ def predict_folds(folds, target_patients, hfo_type_name, models,
                             fold['target_pat_idx'],
                             fold['test_labels'], hfo_type_name,
                             model=model_name)
-
+            bar.update(fold_i)
+        bar.finish()
 # Reviewed
 # Guarda los resultados del fold en la estructura global de patients
 # Es importante que el orden de pacientes los indices de test_pat_idx fue el
@@ -246,14 +259,13 @@ def gather_folds(model_name, hfo_type_name, target_patients, estimator=np.mean):
     for p in target_patients:
         for e in p.electrodes:
             for h in e.events[hfo_type_name]:
-                labels.append(h.info['soz'])
+                labels.append(e.soz)
                 # Checked that classes are [False, True] order
                 prediction = 1 if h.info['prediction'][model_name].count(1) \
                                   >= h.info['prediction'][model_name].count(
                     0) else 0
                 preds.append(prediction)
                 probs.append(estimator(h.info['proba'][model_name]))
-
     return labels, preds, probs
 
 # Reviewed
@@ -297,7 +309,7 @@ def phfo_thresh_filter(target_patients, hfo_type_name, thresh=None, model_name='
 def phfo_filter(hfo_type_name, patients_dic, target=None, tolerated_fpr=None,
                 ):
     if target is None:
-        target = ['model_pat', 'validation_pat']
+        target = ['model_pat', 'validation_pat'] #acordate q ahroa es un string
 
     model_patients, target_patients, test_partition = build_patient_sets(target,
                                                                          hfo_type_name,
@@ -494,7 +506,6 @@ def print_metrics(model, hfo_type_name, y_test, y_pred, y_probs):
     print('-------------------------------------------')
     print('Displaying metrics for {0} using {1} model:'.format(hfo_type_name, model))
     #print('ROC AUC of ---> {0}'.format(roc_auc_score(y_test, y_probs)))
-    print('Accuracy: {0}'.format(accuracy_score(y_test, y_pred)))
     print('Confusion matrix')
     print(confusion_matrix(y_test, y_pred))
     print(classification_report(y_test, y_pred))
@@ -503,3 +514,25 @@ def print_metrics(model, hfo_type_name, y_test, y_pred, y_probs):
     print('-------------------------------------------')
     print('')
 
+def k_means_filter(hfo_type, patients_dic):
+    '''
+    Aims to filter RonO in 180 HZ and Fast RonO in 300 HZ electrical artifacts.
+    Uses freq_av, power_pk, duration (ms) to train kmeans and then ranks the
+    most noisy clusters and removes those events.
+
+    :param hfo_type: The hfo type with electrical artifacts
+    :param patients_dic:
+    :return: modified patients dic for type hfo_type
+    # TODO flush evt count after filter
+    '''
+    if hfo_type == 'Fast RonO':
+        predictors = ['freq_av', 'duration', 'power_pk']
+        data = {predictor: [] for predictor in predictors}
+        #Como se guardan iterando patients_dic.values despues hay que
+        # iterarlo igual y crear un diccionario copia sin alterar el viejo
+        for p in patients_dic.values():
+            for e in p.electrodes:
+                for evt in e.events[hfo_type]:
+                    for pred in predictors:
+                        data[pred].append(evt.info[pred])
+        graphics.k_means_clusters_plot(data)

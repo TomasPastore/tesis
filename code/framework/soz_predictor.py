@@ -35,7 +35,8 @@ def evt_rate_soz_pred_baseline_whole_brain(elec_collection, evt_collection,
                                            restrict_to_tagged_locs=False,
                                            evt_types_to_load=EVENT_TYPES,
                                            evt_types_to_cmp=EVENT_TYPES,
-                                           saving_path=experiment_default_path):
+                                           saving_path=experiment_default_path,
+                                           plot_rocs=False):
     print('SOZ predictor in Whole Brain')
     print('Intraop: {intr}'.format(intr=intraop))
     print('load_untagged_coords_from_db: {0}'.format(
@@ -45,6 +46,8 @@ def evt_rate_soz_pred_baseline_whole_brain(elec_collection, evt_collection,
     print(
         'restrict_to_tagged_coords: {0}'.format(str(restrict_to_tagged_coords)))
     print('restrict_to_tagged_locs: {0}'.format(str(restrict_to_tagged_locs)))
+    print('saving_path: {0}'.format(saving_path))
+
 
     def load_patients_input():
         return load_patients(elec_collection, evt_collection, intraop,
@@ -81,9 +84,10 @@ def evt_rate_soz_pred_baseline_whole_brain(elec_collection, evt_collection,
             print_info(event_type_data_by_loc[loc_name][type_group_name],
                        file=file)
 
-    graphics.event_rate_by_loc(event_type_data_by_loc,
-                               metrics=['pse', 'pnee', 'auc'],
-                               roc_saving_path=saving_path)
+    if plot_rocs:
+        graphics.event_rate_by_loc(event_type_data_by_loc,
+                                   metrics=['pse', 'pnee', 'auc'],
+                                   roc_saving_path=saving_path)
 
     return event_type_data_by_loc, patients_dic
 
@@ -147,27 +151,23 @@ def evt_rate_soz_pred_baseline_localized(elec_collection,
                                          saving_dir=
                                          exp_save_path[3]['iii']['dir'],
                                          models_to_run=models_to_run,
-                                         loc_pat_dic=None,
-                                         plot_rocs=True):
-    print('SOZ predictor localized')
+                                         return_pat_dic_by_loc=False,
+                                         plot_rocs=False):
+    print('SOZ predictor localized Analysis')
     print('Intraop: {intr}'.format(intr=intraop))
-    print('load_untagged_coords_from_db: {0}'.format(
-        str(load_untagged_coords_from_db)))
-    print(
-        'load_untagged_loc_from_db: {0}'.format(str(load_untagged_loc_from_db)))
-    print(
-        'restrict_to_tagged_coords: {0}'.format(str(restrict_to_tagged_coords)))
-    print('restrict_to_tagged_locs: {0}'.format(str(restrict_to_tagged_locs)))
-    '''
-    #Prints all locations
-    print(elec_collection.distinct('loc2'))
-    print(elec_collection.distinct('loc3'))
-    print(elec_collection.distinct('loc5'))
-    print(evt_collection.distinct('loc2'))
-    print(evt_collection.distinct('loc3'))
-    print(evt_collection.distinct('loc5'))
-    '''
-    patients_by_loc = None  # necessary? i think its not
+    print('load_untagged_coords_from_db: {0}'.format(load_untagged_coords_from_db))
+    print('load_untagged_loc_from_db: {0}'.format(load_untagged_loc_from_db))
+    print('restrict_to_tagged_coords: {0}'.format(restrict_to_tagged_coords))
+    print('restrict_to_tagged_locs: {0}'.format(restrict_to_tagged_locs))
+    print('evt_types_to_load : {0}'.format(HFO_TYPES + [
+        'Spikes']))
+    print('evt_to_cmp: {0}'.format([[t] for t in HFO_TYPES + ['Spikes']]))
+    print('locations: {0}'.format(locations))
+    print('saving_dir: {0}'.format(saving_dir))
+    print('models_to_run: {0}'.format(models_to_run))
+
+
+    #patients_by_loc = None  # necessary? i think its not
     local_filter = True
     if local_filter:
         patients_by_loc = load_patients(elec_collection, evt_collection,
@@ -202,10 +202,13 @@ def evt_rate_soz_pred_baseline_localized(elec_collection,
             event_type_data_by_loc[loc_name] = dict()
             if local_filter:
                 whole_brain_name = first_key(patients_by_loc)
-                patients_dic = patients_by_loc[
-                    whole_brain_name]  # whole_brain_name
+                patients_dic = patients_by_loc[whole_brain_name]  # whole_brain_name
+
             else:
                 patients_dic = patients_by_loc[loc_name]
+
+            #for artifact_type in ['RonO', 'FronO']:
+            #   patients_dic = kmean(artifact_type, patients_dic)
             # Create info header
             file_saving_path = str(Path(saving_dir,
                                         'loc_{g}'.format(g=granularity),
@@ -235,7 +238,7 @@ def evt_rate_soz_pred_baseline_localized(elec_collection,
                     if loc_info['patient_count'] >= min_pat_count_in_location \
                             and loc_info[
                         'patients_with_epilepsy'] >= min_pat_with_epilepsy_in_location:
-                        print('Files_saving_path {0}'.format(file_saving_path))
+                        #print('Files_saving_path {0}'.format(file_saving_path))
 
                         if loc_name not in data_by_loc.keys():
                             data_by_loc[loc_name] = dict()
@@ -258,8 +261,9 @@ def evt_rate_soz_pred_baseline_localized(elec_collection,
                             loc_info['AUC_ROC']
 
                         # For saving a location dictionary
-                        if loc_name == loc_pat_dic:
-                            data_by_loc[loc_pat_dic]['patients_dic'] = \
+                        # Same for each hfo type, whole dic
+                        if return_pat_dic_by_loc:
+                            data_by_loc[loc_name]['patients_dic'] = \
                                 loc_info['patients_dic_in_loc']
 
                     else:
@@ -302,7 +306,7 @@ def region_info(patients_dic, event_types=EVENT_TYPES, flush=False,
     for p_name, p in patients_dic.items():
         if location is None:
             electrodes = p.electrodes
-            # pat_in_loc[p_name] = p
+            pat_in_loc[p_name] = p #was commented
         else:
             electrodes = [e for e in p.electrodes if getattr(e,
                                                              'loc{i}'.format(i=

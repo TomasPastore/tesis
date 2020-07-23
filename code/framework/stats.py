@@ -55,6 +55,7 @@ def hfo_rate_statistical_tests(rates_by_type, types=HFO_TYPES,
                                        saving_dir=saving_dir)
     return stats
 
+#We have one table per feature example HFO rate
 def build_stat_table(locations, feat_name, stats):
     stat_names = {'D': 'Kolmogorov-Smirnov test',
                   'W': 'Wilcoxon signed-rank test',

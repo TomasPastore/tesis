@@ -18,7 +18,7 @@ if running_py_3_5:
     import matlab.engine
 
 def save_json(info_dic, saving_path):
-    with open(saving_path+'.json', "w") as file:
+    with open(saving_path, "w") as file:
         json.dump(info_dic, file, indent=4, sort_keys=True)
 
 def load_json(saving_path):
@@ -87,6 +87,14 @@ def print_info(info_evts, file):
     pat_with_empty_loc = pat_with_empty_loc.union(info_evts['pat_with_loc5_empty'])
     print('Count of patients with empty loc: {0}'.format(len(pat_with_empty_loc)), file=file)
     print('List of patients with empty loc: {0}'.format(pat_with_empty_loc), file=file)
+
+def print_all_locations(elec_collection, evt_collection):
+    print(elec_collection.distinct('loc2'))
+    print(elec_collection.distinct('loc3'))
+    print(elec_collection.distinct('loc5'))
+    print(evt_collection.distinct('loc2'))
+    print(evt_collection.distinct('loc3'))
+    print(evt_collection.distinct('loc5'))
 
 def time_counter(callable_code):
     start_time = time.clock()

@@ -1,35 +1,21 @@
-import random
-import sys
-from sys import version as py_version
+import os  # libreria para clear screen
+import \
+    sys  # esto es una libreria para poder terminar el programa llamando a sys.exit(), es una opcion de menu()
 import time
 import warnings
-from pathlib import Path
-import sys # esto es una libreria para poder terminar el programa llamando a sys.exit(), es una opcion de menu()
-import os # libreria para clear screen
-from time import sleep
+from sys import version as py_version
+
 warnings.filterwarnings("ignore", module="matplotlib")
 warnings.simplefilter(action='ignore', category=FutureWarning)
-import numpy as np
-from matplotlib import \
-    pyplot as plt  # todo ver donde se usa, deberia estar solo en graphics
-import math as mt
-from datetime import timedelta
-from config import (EVENT_TYPES, exp_save_path, TEST_BEFORE_RUN,
-                    experiment_default_path,
-                    intraop_patients, models_to_run)
-from db_parsing import Database, parse_patients, get_locations, \
-    get_granularity, encode_type_name, preference_locs, load_patients, query_filters, \
-    all_subtype_names
+from config import (TEST_BEFORE_RUN)
+from db_parsing import Database
 
 running_py_3_5 = py_version[2] == '5'
 if running_py_3_5:
     pass
-from utils import all_subsets, LOG, print_info
 import tests
 from driver import Driver
 import unittest
-import graphics
-import math as mt
 
 
 def main(interactive_exp_menu=False):
@@ -49,7 +35,7 @@ def main(interactive_exp_menu=False):
             unittest.main(tests, exit=False)
 
         # Experiment list for the driver:
-        exp_driver.run_experiment( number=3, roman_num='iii', letter='a')
+        exp_driver.run_experiment( number=4, roman_num='i', letter='a')
 
 
 def experiment_menu(exp_driver):
@@ -74,13 +60,13 @@ def experiment_menu(exp_driver):
         exp_driver.run_experiment(number=2, roman_num='ii') #localized
         go_to_menu_after(5, exp_driver)
     elif option == 3:
-        exp_driver.run_experiment(number=3, roman_num='0') # whole brain HFOs
+        #exp_driver.run_experiment(number=3, roman_num='0') # whole brain HFOs
         # together
-        exp_driver.run_experiment(number=3, roman_num='i', letter='a') #whole
+        #exp_driver.run_experiment(number=3, roman_num='i', letter='a') #whole
         # brain untagged
-        exp_driver.run_experiment(number=3, roman_num='i', letter='b') #whole
+        #exp_driver.run_experiment(number=3, roman_num='i', letter='b') #whole
         # brain tagged
-        exp_driver.run_experiment(number=3, roman_num='ii') # PSE AUC relation
+        #exp_driver.run_experiment(number=3, roman_num='ii') # PSE AUC relation
         exp_driver.run_experiment(number=3, roman_num='iii') # localized
         go_to_menu_after(5, exp_driver)
 

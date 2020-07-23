@@ -3,14 +3,12 @@ import math as mt
 from decimal import Decimal
 from pathlib import Path
 from sys import version as py_version
-
 import numpy as np
 import plotly.graph_objects as go
 import sklearn.metrics as metrics
 from matplotlib import pyplot as plt
-from sklearn.metrics import roc_curve, precision_recall_curve, \
-    average_precision_score
-
+from mpl_toolkits import mplot3d
+from sklearn import metrics
 from config import EVENT_TYPES, intraop_patients, HFO_TYPES, color_list, \
     models_to_run, EXPERIMENTS_FOLDER, orca_executable, exp_save_path
 
@@ -147,7 +145,7 @@ def plot_types_feature_distribution(rates_by_type, feature, saving_dir):
     saving_dir = str(Path(saving_dir, feature))
     Path(saving_dir).mkdir(0o777, parents=True, exist_ok=True)
     fig_path = str(Path(saving_dir, feature + '_distrs.pdf'))
-    print('Distributions saving path: {0}'.format(fig_path))
+    #print('Distributions saving path: {0}'.format(fig_path))
     import seaborn as sns
     sns.set_style("white")
     # Plot
@@ -282,8 +280,8 @@ def event_rate_by_loc(hfo_type_data_by_loc, zoomed_type=None, metrics=['pse', 'p
     plt.subplots_adjust(wspace=0.4, hspace=0.4)
     for fmt in ['pdf', 'png']:
         saving_path_f = '{file_path}.{format}'.format(file_path=roc_saving_path, format=fmt)
-        if fmt == 'pdf':
-            print('ROC saving path: {0}'.format(saving_path_f))
+        #if fmt == 'pdf':
+            #print('ROC saving path: {0}'.format(saving_path_f))
         plt.savefig(saving_path_f, bbox_inches='tight')
     plt.show()
     plt.close(fig)
@@ -503,6 +501,8 @@ def plot_co_pse_auc(data_by_loc, saving_path):
 def ml_training_plot(target_patients, loc_name, hfo_type, roc=True,
                      pre_rec=False, models_to_run=models_to_run,
                      saving_dir=exp_save_path[4]['dir']):
+    from ml_hfo_classifier import gather_folds, print_metrics
+
     fig = plt.figure()
     fig.suptitle('SOZ HFO classfiers in {0}'.format(loc_name),
                  fontsize=16)
@@ -514,15 +514,14 @@ def ml_training_plot(target_patients, loc_name, hfo_type, roc=True,
                                             target_patients, estimator=np.mean)
 
         print('Displaying metrics for {t} in {l} ml HFO classifier using {'
-              'm}'.format(t=hfo_type, l=location, m=model_name))
+              'm}'.format(t=hfo_type, l=loc_name, m=model_name))
         print_metrics(model_name, hfo_type, labels, preds, probs)
 
         # Plot ROC curve
         curve_kind = 'ROC'
-        fpr, tpr, thresholds = roc_curve(labels, probs)
-        roc_auc = auc(fpr, tpr)
+        fpr, tpr, thresholds = metrics.roc_curve(labels, probs)
         plot_axe[model_name][curve_kind].plot(fpr, tpr, lw=1, alpha=0.8,
-                                  label='AUC = %0.2f' % fold)
+                                  label='AUC = %0.2f' % metrics.auc(fpr, tpr))
         plot_axe[model_name][curve_kind].plot([0, 1], [0, 1], linestyle='--',
                                          lw=2, color='r', label='Chance',
                                          alpha=.8)
@@ -530,17 +529,17 @@ def ml_training_plot(target_patients, loc_name, hfo_type, roc=True,
                    plot_axe[model_name][curve_kind])
 
         # PRE REC
-        precision, recall, thresholds = precision_recall_curve(labels,
+        precision, recall, thresholds = metrics.precision_recall_curve(labels,
                                                                probs)
         precision = np.array(list(reversed(list(precision))))
         recall = np.array(list(reversed(list(recall))))
         #thesholds = np.array(list(reversed(list(thresholds))))
-        ap = average_precision_score(labels, probs)
-        auc = auc(recall, precision)
+        ap = metrics.average_precision_score(labels, probs)
+        auc_val = metrics.auc(recall, precision)
         curve_kind= 'PRE_REC'
         plot_axe[model_name][curve_kind].plot(recall, precision, color='b',
                                               label='AUC = %0.2f . AP = %0.2f' % (
-                                                  auc, ap),
+                                                  auc_val, ap),
                                               lw=2, alpha=.8)
         set_titles('Recall', 'Precision', model_name,
                    plot_axe[model_name][curve_kind])
@@ -1039,11 +1038,22 @@ def axes_by_model(plt, models_to_run):
     return axes
 
 # Reviewed
-def set_titles(x_title, y, model_name, axe):
-    plot_axe[model_name][curve_kind].set_xlim([-0.05, 1.05])
+def set_titles(x_title, y_title, model_name, axe):
+    axe.set_xlim([-0.05, 1.05])
     axe.set_ylim([-0.05, 1.05])
     axe.set_xlabel(x_title)
     axe.set_ylabel(y_title)
     axe.set_title(model_name)
     axe.legend(loc="lower right")
 
+def k_means_clusters_plot(data):
+    for k,v in data.items():
+        x = data['freq_av'] if 'freq_av' in data.keys() else 'freq_pk'
+        y = data['power_av'] if 'power_av' in data.keys() else 'power_pk'
+        z = data['duration']
+
+    fig = plt.figure()
+    ax = plt.axes(projection="3d")
+    ax.scatter3D(x, y, z, c=x, cmap='hsv');
+
+    plt.show()
