@@ -564,46 +564,34 @@ def ml_hfo_classifier_sk_learn_train(patients_dic,
     pero principalmente las features PAC.
     use_coords: indica si usar x,y,z como features en ml o no.
 
-    Retorna:
-    # target_patients: Lista de Patients de training con probas de ser SOZ en
-    patient.electrode.events[hfo_type][i].info['proba'] notar que como es training
-     se excluye el set de validacion
     '''
     print('ML HFO classifier for location: '
           '{l} and type: {t}'.format(l=location, t=hfo_type))
     print('target_patients_id: {t}'.format(t=target_patients_id))
     print('saving_dir: {0}'.format(saving_dir))
-    # This is if we want to exclude from ml analysis the patients that have
-    # less than N events so their electrode rates will remain unchanged
-    quantiles_dic = hfo_count_quantiles(patients_dic, hfo_type)
-    print('Hfo count quantile dic {0}'.format(quantiles_dic))  # ej
-    # quantiles_dic[0.3][0]
-    enough_hfo_pat, excluded_pat = patients_with_more_than(quantiles_dic[0][0],
-                                                           patients_dic,
-                                                           hfo_type
-                                                           )
 
-    model_patients, target_patients, test_partition = build_patient_sets(
-        target_patients_id, enough_hfo_pat, location)
+    # TODO Exclude validation names
+    # TODO create folds
 
-    folds = build_folds(hfo_type, model_patients,
-                        target_patients, test_partition)
+    # Do crossvalidation with target training patients., print scores and
+    # return preds . #Pregunta, corre los mismos hiperparametros entre folds no?
+    # Estaba aplicando mal el ml, se hace por fold y se promedia,
+    # no se guarda cada la pred de cada evento por separado porq no es bueno
+    # para generalizar el error, aunque te deja ver la prediccion para
+    # entrenamiento pero hay que tener claro que ese eso. Lo mas importante
+    # es que un histograma de f1 score sea bueno.
 
-    predict_folds(folds, target_patients, hfo_type,
-                  models=ml_models, sim_recall=sim_recall)
+    #TODO hacer crossvalidate de metricas deseadas y hacer histogramas
+    # Plotear #Histograma de aucs de folds, de f1score de folds
 
-    plot = graphics.ml_training_plot(target_patients, location, hfo_type, roc=True,
-                                     pre_rec=True, models_to_run=ml_models,
-                                     saving_dir=saving_dir)
-    # Esto incluye a los excluidos por cuantil con todos sus eventos sin filtro
-    for pat_id, p in excluded_pat.items():
-        for e in p.electrodes:
-            for h in e.events[hfo_type]:
-                for model_name in ml_models:
-                    h.info['prediction'][model_name] = 1
-                    h.info['proba'][model_name] = 1
-        target_patients.append(p)
-    return target_patients
+
+    #TODO crossval predict y plotear entrenamiento
+    '''
+       plot = graphics.ml_training_plot(target_patients, location, hfo_type, roc=True,
+                                        pre_rec=True, models_to_run=ml_models,
+                                        saving_dir=saving_dir)
+       '''
+
 
 '''
 def ml():
