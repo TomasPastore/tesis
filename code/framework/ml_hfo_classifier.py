@@ -184,7 +184,7 @@ def predict_folds(folds, target_patients, hfo_type_name, models,
                             model=model_name)
             bar.update(fold_i)
         bar.finish()
-
+    #print(folds)
     # Generate distr for simulator
     if 'Simulator' in models:
         distr = {'FN': [], 'FP': [], 'TP': [], 'TN': []}
@@ -362,7 +362,6 @@ def hfo_count_quantiles(patients_dic, hfo_type_name):
     return {qs[i]: (quantiles[i], len([c for c in counts if c > quantiles[i]]))
             for i in range(len(qs))}
 
-
 '''
 
 # REMOVER MODULO, METER
@@ -536,3 +535,94 @@ def k_means_filter(hfo_type, patients_dic):
                     for pred in predictors:
                         data[pred].append(evt.info[pred])
         graphics.k_means_clusters_plot(data)
+    else:
+        print('Not implemented filter type')
+        raise NotImplementedError()
+    return patients_dic
+
+
+def youden(fpr, tpr, thresholds):
+    optimal_idx = np.argmax(tpr - fpr)
+    return thresholds[optimal_idx]
+
+
+def ml_hfo_classifier_sk_learn_train(patients_dic,
+                                     location,
+                                     hfo_type,
+                                     use_coords,
+                                     ml_models= ['XGBoost'],
+                                     sim_recall=None,
+                                     saving_dir=None):
+    '''
+
+    Parametros:
+    patients_dic: tiene como claves los patient_id y como valor un objeto
+    Patient populado con lo necesario para aplicar ml en location siguiendo los
+    otros parametros que tambien se indican
+    location: es la region en la cual se hace ml
+    hfo_type: es el tipo al cual le aplicaremos, varían los hiperparametros
+    pero principalmente las features PAC.
+    use_coords: indica si usar x,y,z como features en ml o no.
+
+    Retorna:
+    # target_patients: Lista de Patients de training con probas de ser SOZ en
+    patient.electrode.events[hfo_type][i].info['proba'] notar que como es training
+     se excluye el set de validacion
+    '''
+    print('ML HFO classifier for location: '
+          '{l} and type: {t}'.format(l=location, t=hfo_type))
+    print('target_patients_id: {t}'.format(t=target_patients_id))
+    print('saving_dir: {0}'.format(saving_dir))
+    # This is if we want to exclude from ml analysis the patients that have
+    # less than N events so their electrode rates will remain unchanged
+    quantiles_dic = hfo_count_quantiles(patients_dic, hfo_type)
+    print('Hfo count quantile dic {0}'.format(quantiles_dic))  # ej
+    # quantiles_dic[0.3][0]
+    enough_hfo_pat, excluded_pat = patients_with_more_than(quantiles_dic[0][0],
+                                                           patients_dic,
+                                                           hfo_type
+                                                           )
+
+    model_patients, target_patients, test_partition = build_patient_sets(
+        target_patients_id, enough_hfo_pat, location)
+
+    folds = build_folds(hfo_type, model_patients,
+                        target_patients, test_partition)
+
+    predict_folds(folds, target_patients, hfo_type,
+                  models=ml_models, sim_recall=sim_recall)
+
+    plot = graphics.ml_training_plot(target_patients, location, hfo_type, roc=True,
+                                     pre_rec=True, models_to_run=ml_models,
+                                     saving_dir=saving_dir)
+    # Esto incluye a los excluidos por cuantil con todos sus eventos sin filtro
+    for pat_id, p in excluded_pat.items():
+        for e in p.electrodes:
+            for h in e.events[hfo_type]:
+                for model_name in ml_models:
+                    h.info['prediction'][model_name] = 1
+                    h.info['proba'][model_name] = 1
+        target_patients.append(p)
+    return target_patients
+
+'''
+def ml():
+    from sklearn.pipeline import make_pipeline
+    clf = make_pipeline(preprocessing.StandardScaler(), svm.SVC(C=1))
+    cross_val_score(clf, X, y, cv=cv)
+
+    >> > from sklearn.model_selection import cross_val_score
+    >> > clf = svm.SVC(kernel='linear', C=1)
+    >> > scores = cross_val_score(clf, X, y, cv=5)
+    >>> import numpy as np
+>>> from sklearn.model_selection import GroupShuffleSplit
+>>> X = np.ones(shape=(8, 2))
+>>> y = np.ones(shape=(8, 1))
+>>> groups = np.array([1, 1, 2, 2, 2, 3, 3, 3])
+>>> print(groups.shape)
+(8,)
+>>> gss = GroupShuffleSplit(n_splits=2, train_size=.7, random_state=42)
+>>> gss.get_n_splits()
+2
+>>> for train_idx, test_idx in gss.split(X, y, groups):
+'''

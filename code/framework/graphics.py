@@ -1047,13 +1047,18 @@ def set_titles(x_title, y_title, model_name, axe):
     axe.legend(loc="lower right")
 
 def k_means_clusters_plot(data):
-    for k,v in data.items():
-        x = data['freq_av'] if 'freq_av' in data.keys() else 'freq_pk'
-        y = data['power_av'] if 'power_av' in data.keys() else 'power_pk'
-        z = data['duration']
-
+    x = data['freq_av'] if 'freq_av' in data.keys() else data['freq_pk']
+    y = data['duration']
+    z = data['power_av'] if 'power_av' in data.keys() else data['power_pk']
     fig = plt.figure()
     ax = plt.axes(projection="3d")
-    ax.scatter3D(x, y, z, c=x, cmap='hsv');
+
+    ax.scatter3D(x, y, z, c=x, cmap='hsv', marker='o')
+    ax.set_xlabel('Freq av' if 'freq_av' in data.keys() else 'Freq pk' )
+    ax.set_ylabel('Duration (ms)')
+    ax.set_zlabel('Power av' if 'power_av' in data.keys() else 'Power pk')
+
+    ax.set_title('FronO clusters')
+    ax.legend(loc="lower right")
 
     plt.show()

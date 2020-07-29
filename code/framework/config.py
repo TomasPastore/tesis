@@ -12,7 +12,7 @@ type_names_to_run = ['RonS']  # default value
 # type_names_to_run =  ['RonO', 'RonS', 'Fast RonO', 'Fast RonS']
 
 # Global var of the models of ml to run, XGBoost default
-models_to_run = ['XGBoost', 'SGD']  # 'Balanced random forest''Linear SVM'
+models_to_run = ['XGBoost']  # 'Balanced random forest''Linear SVM'
 # 'Simulated'
 models_to_run_obj = [xgboost]  # The python objects of the sklearn class
 models_dic = {'XGBoost': xgboost,
@@ -99,6 +99,7 @@ color_list = ['blue', 'green', 'magenta', 'yellow', 'lightcyan', 'black',
 
 TESIS_ROOT_DIR = Path('~/Documentos/lic_computacion/tesis').expanduser().resolve()
 EXPERIMENTS_FOLDER = str(Path( TESIS_ROOT_DIR,'experiments/'))
+FRonO_KMEANS_EXP_DIR = str(Path( TESIS_ROOT_DIR,'experiments/FRonO_k_means'))
 experiment_default_path = str(Path(EXPERIMENTS_FOLDER, 'exp'))
 
 exp_save_path = dict()  # 7 'Experiments'

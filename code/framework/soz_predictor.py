@@ -152,16 +152,16 @@ def evt_rate_soz_pred_baseline_localized(elec_collection,
                                          exp_save_path[3]['iii']['dir'],
                                          models_to_run=models_to_run,
                                          return_pat_dic_by_loc=False,
-                                         plot_rocs=False):
+                                         plot_rocs=False,
+                                         remove_elec_artifacts=False):
     print('SOZ predictor localized Analysis')
     print('Intraop: {intr}'.format(intr=intraop))
     print('load_untagged_coords_from_db: {0}'.format(load_untagged_coords_from_db))
     print('load_untagged_loc_from_db: {0}'.format(load_untagged_loc_from_db))
     print('restrict_to_tagged_coords: {0}'.format(restrict_to_tagged_coords))
     print('restrict_to_tagged_locs: {0}'.format(restrict_to_tagged_locs))
-    print('evt_types_to_load : {0}'.format(HFO_TYPES + [
-        'Spikes']))
-    print('evt_to_cmp: {0}'.format([[t] for t in HFO_TYPES + ['Spikes']]))
+    print('evt_types_to_load : {0}'.format(evt_types_to_load))
+    print('evt_to_cmp: {0}'.format(evt_types_to_cmp))
     print('locations: {0}'.format(locations))
     print('saving_dir: {0}'.format(saving_dir))
     print('models_to_run: {0}'.format(models_to_run))
@@ -179,7 +179,8 @@ def evt_rate_soz_pred_baseline_localized(elec_collection,
                                         load_untagged_coords_from_db=load_untagged_coords_from_db,
                                         load_untagged_loc_from_db=load_untagged_loc_from_db,
                                         restrict_to_tagged_coords=restrict_to_tagged_coords,
-                                        restrict_to_tagged_locs=restrict_to_tagged_locs)
+                                        restrict_to_tagged_locs=restrict_to_tagged_locs,
+                                        remove_elec_artifacts=remove_elec_artifacts)
 
     # Saves pse and AUC ROC of each HFO type of baseline rate
     data_by_loc = dict()

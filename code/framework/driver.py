@@ -193,7 +193,7 @@ class Driver():
                     # still 2 electrodes in None because of bad format of
                     # the field (empty lists map to None) from db
                     restrict_to_tagged_coords = True
-                    restrict_to_tagged_locs = False
+                    restrict_to_tagged_locs = True
                     locations = {0: ['Whole Brain']}
                     saving_dir = exp_save_path[3]['i']['b']
 
@@ -232,14 +232,15 @@ class Driver():
                                                      plot_rocs=True)
         elif number == 4:
             # 4) ML HFO classifiers para extremos de 3 iii
+            evt_types_to_load= HFO_TYPES #Cargo los 4 por consistencia y para
+            # tener todos los baseline
             if roman_num == 'i':
-                location = 'Whole Brain'
-                if letter == 'a':
+                if letter == 'a': #DEPRECADO ?
                     print('\nRunning exp 4.i.a) ML HFO classifier for Whole '
                           'Brain with coords untagged')
                     restrict_to_tagged_coords = False
                     restrict_to_tagged_locs = False
-                    locations = locations = {0: [location]}
+                    locations = locations = {0: ['Whole Brain']}
                     saving_dir = exp_save_path[4]['i']['a']  # dir
                     use_coords = False
 
@@ -248,10 +249,10 @@ class Driver():
                           'Brain with coords tagged')
                     # Whole brain with x, y, z in ml
                     restrict_to_tagged_coords = True
-                    restrict_to_tagged_locs = False
-                    locations =  locations= {0: [location]}
+                    restrict_to_tagged_locs = True
+                    locations =  locations= {0: ['Whole Brain']}
                     saving_dir = exp_save_path[4]['i']['b']  # dir
-                    use_coords = True
+                    use_coords = True #TODO ver si se usa
                 else:
                     raise NOT_IMPLEMENTED_EXP
             elif roman_num == 'ii':
@@ -266,8 +267,10 @@ class Driver():
                     locations = {5: [location]}
                     saving_dir = exp_save_path[4]['ii'][location]  # dir
                     use_coords = False
-                else:
+                else: # Letter
                     raise NOT_IMPLEMENTED_EXP
+            else: # Roman num
+                raise NOT_IMPLEMENTED_EXP
 
             baselines_data, data_by_loc = \
                 evt_rate_soz_pred_baseline_localized(
@@ -278,11 +281,8 @@ class Driver():
                     load_untagged_loc_from_db=True,
                     restrict_to_tagged_coords=restrict_to_tagged_coords,
                     restrict_to_tagged_locs=restrict_to_tagged_locs,
-                    evt_types_to_load=HFO_TYPES,
-                    evt_types_to_cmp=[[t]
-                                      for
-                                      t in
-                                      HFO_TYPES],
+                    evt_types_to_load=evt_types_to_load, #HFO_TYPES
+                    evt_types_to_cmp=[[t] for t in evt_types_to_load],
                     locations=locations,
                     saving_dir=saving_dir,
                     return_pat_dic_by_loc=True,
@@ -290,18 +290,21 @@ class Driver():
 
             for locs in locations.values():
                 for location in locs:
-                    patients_dic = data_by_loc[location]['patients_dic']
-                    for hfo_type in HFO_TYPES:
-                        ml_hfo_classifier(patients_dic,
-                                          location=location,
-                                          hfo_type=hfo_type,
-                                          use_coords=use_coords,
-                                          target_patients_id='MODEL_PATIENTS',
-                                          saving_dir=saving_dir)
-            # Usar sklearn pipeline
-            # Resultados: xgboost, model_patients (%75), random partition, robust scaler, balanced, filter 0.7 da 0.8 de AP
-            # hippocampus_hfo_classifier(self.elec_collection,
-            # self.evt_collection) #
+                    patients_dic = data_by_loc[location]['patients_dic'] #ya
+                    # filtrado el diccionario de pacientes en loc
+                    for hfo_type in evt_types_to_load:
+                        #if hfo_type in []:
+                        #    continue
+                        ml_hfo_classifier_sk_learn_train(patients_dic,
+                                                         location=location,
+                                                         #solo para saber en
+                                                         # que location
+                                                         # estoy, pero el
+                                                         # pat_dic
+                                                         # ya esta filtrado
+                                                         hfo_type=hfo_type,
+                                                         use_coords=use_coords,
+                                                         saving_dir=saving_dir)
         elif number == 5:
             # 5) pHFOs rate VS HFO rate baseline
             # TODO week 12/7

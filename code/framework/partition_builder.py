@@ -103,6 +103,7 @@ def pull_apart_validation_set(patients_dic, location, val_size=0.3):
         save_json(names_by_loc, VALIDATION_NAMES_BY_LOC_PATH)  # Update json
 
     else:
+        print('Loading predefined {0} Validation names'.format(location))
         validation_names = names_by_loc[location]
     print('Validation patient names in {l}: {v}'.format(l=location,
                                                    v=validation_names))
@@ -187,14 +188,19 @@ def build_folds(hfo_type_name, model_patients, target_patients, test_partition):
         # TODO review scaler
         # scaler = RobustScaler()  # Scale features using statistics that are
         # robust to outliers.
-        # scaler = StandardScaler()
-        # train_features = scaler.fit_transform(train_features)
-        # test_features = scaler.transform(test_features)
-
-        # Resampling and balancing classes
-        # train_features, train_labels = balance_samples(train_features, train_labels)
-        # train_features = scaler.fit_transform(train_features)
-        # test_features = scaler.transform(test_features)
+        # Tengo que guardar el scaler para validacion todo
+        scaler = StandardScaler()
+        balance = False
+        if balance:
+            # Resampling and balancing classes
+            train_features, train_labels = balance_samples(train_features, train_labels)
+            train_features = scaler.fit_transform(train_features)
+            test_features = scaler.transform(test_features)
+        else:
+            # Scaling (comment if balance is enable)
+            # train_features = scaler.fit_transform(train_features)
+            # test_features = scaler.transform(test_features)
+            pass
 
         folds.append({
             'train_features': train_features,

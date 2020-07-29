@@ -7,7 +7,7 @@ from sys import version as py_version
 
 warnings.filterwarnings("ignore", module="matplotlib")
 warnings.simplefilter(action='ignore', category=FutureWarning)
-from config import (TEST_BEFORE_RUN)
+from config import TEST_BEFORE_RUN, FRonO_KMEANS_EXP_DIR
 from db_parsing import Database
 
 running_py_3_5 = py_version[2] == '5'
@@ -31,11 +31,11 @@ def main(interactive_exp_menu=False):
         experiment_menu(exp_driver)
     else:
         if TEST_BEFORE_RUN:
-            # TODO Agregar a informe, tests
             unittest.main(tests, exit=False)
 
         # Experiment list for the driver:
-        exp_driver.run_experiment( number=4, roman_num='i', letter='a')
+        exp_driver.run_experiment( number=4, roman_num='ii', letter='a')
+        #FRonO_paper(elec_collection, evt_collection)
 
 
 def experiment_menu(exp_driver):
@@ -100,6 +100,7 @@ def clear_screen():
         _ = os.system('cls')
     else:
         _ = os.system('clear')
+
 def go_to_menu_after(seconds, exp_driver):
     seconds = 5
     while seconds > 0:
@@ -107,6 +108,22 @@ def go_to_menu_after(seconds, exp_driver):
         time.sleep(1)  # wait 1 sec
         seconds = seconds - 1
     experiment_menu(exp_driver)
+
+def FRonO_paper(elec_collection, evt_collection):
+    from soz_predictor import evt_rate_soz_pred_baseline_localized
+    evt_rate_soz_pred_baseline_localized(elec_collection,
+                                         evt_collection,
+                                         intraop=False,
+                                         restrict_to_tagged_coords=True,
+                                         restrict_to_tagged_locs=True,
+                                         evt_types_to_load=['Fast RonO'],
+                                         evt_types_to_cmp=[['Fast RonO']],
+                                         locations={0: ['Whole Brain']},
+                                         saving_dir=FRonO_KMEANS_EXP_DIR,
+                                         #return_pat_dic_by_loc=True,
+                                         plot_rocs=False,
+                                         remove_elec_artifacts=True)
+
 
 if __name__ == "__main__":
     main(interactive_exp_menu=False)

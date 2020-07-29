@@ -7,6 +7,7 @@ from config import EVENT_TYPES, non_intraop_patients, intraop_patients, \
     electrodes_query_fields, \
     hfo_query_fields
 from utils import log
+import config
 
 import pymongo
 from pymongo import MongoClient
@@ -42,11 +43,14 @@ class Database(object):
 # Makes a db find for each location
 def load_patients(electrodes_collection, evt_collection, intraop,
                   loc_granularity, locations,
-                  event_type_names, models_to_run, subtypes_from_db=None,
+                  event_type_names,
+                  models_to_run=config.models_to_run,
+                  subtypes_from_db=None,
                   load_untagged_coords_from_db=True,
                   load_untagged_loc_from_db=True,
                   restrict_to_tagged_coords=False,
-                  restrict_to_tagged_locs=False):
+                  restrict_to_tagged_locs=False,
+                  remove_elec_artifacts =True ):
     print('Loading patients from db...')
     loc, locations = get_locations(loc_granularity, locations)
     print('Locations: {0}'.format(locations))
@@ -71,13 +75,13 @@ def load_patients(electrodes_collection, evt_collection, intraop,
                                                    models_to_run,
                                                    restrict_to_tagged_coords,
                                                    restrict_to_tagged_locs)
-        remove_elec_artifacts = False #TODO extraer a parametro
+
         if loc_name == 'Whole Brain' and remove_elec_artifacts:
             print('\nK means filter for FronO and RonO electrical '
                   'artifacts')
             from ml_hfo_classifier import k_means_filter
 
-            for hfo_type in ['RonO', 'Fast RonO']:
+            for hfo_type in ['Fast RonO']:
                 patients_dic = k_means_filter(hfo_type, patients_dic)
 
         patients_by_loc[loc_name] = patients_dic
