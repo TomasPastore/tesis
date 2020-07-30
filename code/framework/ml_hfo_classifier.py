@@ -6,9 +6,15 @@ import progressbar
 import graphics
 from config import models_dic
 from sklearn.metrics import confusion_matrix, classification_report
-
+from sklearn.model_selection import GroupShuffleSplit
 from partition_builder import patients_with_more_than, build_patient_sets, \
     build_folds
+from utils import map_pat_ids
+from sklearn.pipeline import make_pipeline
+from sklearn.model_selection import cross_val_score, cross_validate, cross_val_predict
+from sklearn import preprocessing, metrics
+from partition_builder import pull_apart_validation_set, ml_field_names
+from xgboost.sklearn import XGBClassifier
 
 #TODO
 def compare_Hippocampal_RonS_ml_models(elec_collection, evt_collection):
@@ -545,7 +551,7 @@ def youden(fpr, tpr, thresholds):
     optimal_idx = np.argmax(tpr - fpr)
     return thresholds[optimal_idx]
 
-
+#Returns best estimator params for validation in location
 def ml_hfo_classifier_sk_learn_train(patients_dic,
                                      location,
                                      hfo_type,
@@ -554,7 +560,6 @@ def ml_hfo_classifier_sk_learn_train(patients_dic,
                                      sim_recall=None,
                                      saving_dir=None):
     '''
-
     Parametros:
     patients_dic: tiene como claves los patient_id y como valor un objeto
     Patient populado con lo necesario para aplicar ml en location siguiendo los
@@ -563,54 +568,101 @@ def ml_hfo_classifier_sk_learn_train(patients_dic,
     hfo_type: es el tipo al cual le aplicaremos, varían los hiperparametros
     pero principalmente las features PAC.
     use_coords: indica si usar x,y,z como features en ml o no.
-
     '''
     print('ML HFO classifier for location: '
           '{l} and type: {t}'.format(l=location, t=hfo_type))
-    print('target_patients_id: {t}'.format(t=target_patients_id))
     print('saving_dir: {0}'.format(saving_dir))
+    model_patients, validation_patients = pull_apart_validation_set(
+        patients_dic, location, val_size=0.3)
+    field_names = ml_field_names(hfo_type, include_coords=use_coords)
+    X, y, groups = serialize_patients_to_events(model_patients, hfo_type, field_names)
+    cv = GroupShuffleSplit(n_splits=1000, test_size=.3, random_state=42)
 
-    # TODO Exclude validation names
-    # TODO create folds
+    #For model in models
+    xgboost = XGBClassifier(learning_rate=0.05,
+                        n_estimators=100,  # 100
+                        max_depth=6,
+                        min_child_weight=3,
+                        gamma=0.05,
+                        subsample=0.8,
+                        colsample_bytree=0.8,
+                        reg_alpha=0.005,
+                        objective='binary:logistic',
+                        nthread=-1,
+                        scale_pos_weight=1,
+                        seed=10,
+                        eval_metric='aucpr'  # 'aucpr'
+                        )
 
-    # Do crossvalidation with target training patients., print scores and
-    # return preds . #Pregunta, corre los mismos hiperparametros entre folds no?
-    # Estaba aplicando mal el ml, se hace por fold y se promedia,
-    # no se guarda cada la pred de cada evento por separado porq no es bueno
-    # para generalizar el error, aunque te deja ver la prediccion para
-    # entrenamiento pero hay que tener claro que ese eso. Lo mas importante
-    # es que un histograma de f1 score sea bueno.
+    clf = make_pipeline(preprocessing.StandardScaler(), xgboost)
+    def tn(y, y_pred): return metrics.confusion_matrix(y, y_pred)[0, 0]
+    def fp(y, y_pred): return confusion_matrix(y, y_pred)[0, 1]
+    def fn(y, y_pred): return confusion_matrix(y, y_pred)[1, 0]
+    def tp(y, y_pred): return confusion_matrix(y, y_pred)[1, 1]
+    scoring = {'precision': 'precision',
+               'recall': 'recall',
+               'tp': metrics.make_scorer(tp),
+               'tn': metrics.make_scorer(tn),
+               'fp': metrics.make_scorer(fp),
+               'fn': metrics.make_scorer(fn),
+               'balanced_accuracy': metrics.make_scorer(
+                   metrics.balanced_accuracy,
+                   adjusted=True),
+               'f1_score': 'f1',
+               'average_precision': 'average_precision',
+               'roc_auc': 'roc_auc',
+               }
+    cv_results = cross_validate(clf, X, y, groups, scoring, cv=cv, n_jobs=-1,
+                                return_estimator=True)
+    print(cv_results)
 
-    #TODO hacer crossvalidate de metricas deseadas y hacer histogramas
-    # Plotear #Histograma de aucs de folds, de f1score de folds
-
-
-    #TODO crossval predict y plotear entrenamiento
     '''
-       plot = graphics.ml_training_plot(target_patients, location, hfo_type, roc=True,
-                                        pre_rec=True, models_to_run=ml_models,
-                                        saving_dir=saving_dir)
-       '''
+    probas = cross_val_predict(clf, X, y, groups, cv=cv, n_jobs=-1,
+                               method= 'predict_proba')
+    data_by_model['XGBoost'] = dict()
+    data_by_model['XGBoost']['probas'] = probas
+    data_by_model['XGBoost']['y'] = y
+    plot = graphics.ml_training_plot(data_by_model, location, hfo_type,
+                                     roc=True, pre_rec=True,
+                                     saving_dir=saving_dir)
+    '''
+
+    '''
+    # TODO manual
+    for train_idx, test_idx in gss_validation.split(X, y, groups):
+        print("TRAIN:", train_idx, "TEST:", test_idx)
+    '''
 
 
-'''
-def ml():
-    from sklearn.pipeline import make_pipeline
-    clf = make_pipeline(preprocessing.StandardScaler(), svm.SVC(C=1))
-    cross_val_score(clf, X, y, cv=cv)
 
-    >> > from sklearn.model_selection import cross_val_score
-    >> > clf = svm.SVC(kernel='linear', C=1)
-    >> > scores = cross_val_score(clf, X, y, cv=5)
-    >>> import numpy as np
->>> from sklearn.model_selection import GroupShuffleSplit
->>> X = np.ones(shape=(8, 2))
->>> y = np.ones(shape=(8, 1))
->>> groups = np.array([1, 1, 2, 2, 2, 3, 3, 3])
->>> print(groups.shape)
-(8,)
->>> gss = GroupShuffleSplit(n_splits=2, train_size=.7, random_state=42)
->>> gss.get_n_splits()
-2
->>> for train_idx, test_idx in gss.split(X, y, groups):
-'''
+
+def serialize_patients_to_events(model_patients, hfo_type, field_names):
+    X, y, groups = [], [], []
+    pac = [f for f in field_names if 'angle' in f or 'vs' in f]
+    groups = map_pat_ids(model_patients)
+    for p in model_patients:
+        for e in p.electrodes:
+            for h in e.events[hfo_type]:
+                if all([isinstance(h.info[f], float) for f in
+                        pac]):  # I use
+                    # this event only if all the pac is not null, else skip,
+                    # if you don't use any '_angle' or 'vs' PAC property this takes
+                    # every event
+                    feature_row_i = {}
+                    for feature_name in field_names:
+                        if 'angle' in feature_name or 'vs' in feature_name:
+                            feature_row_i[
+                                'SIN({0})'.format(feature_name)] = mt.sin(
+                                h.info[feature_name])
+                            feature_row_i[
+                                'COS({0})'.format(feature_name)] = mt.cos(
+                                h.info[feature_name])
+                        else:
+                            feature_row_i[feature_name] = h.info[
+                                feature_name]
+                    X.append(feature_row_i)
+                    y.append(h.info['soz'])
+
+    X_pd = pd.DataFrame(X)
+    feature_names = X_pd.columns  # adds sin and cos for PAC
+    return X_pd.values, np.array(y), np.array(groups)

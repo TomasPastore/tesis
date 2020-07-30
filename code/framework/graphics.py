@@ -498,7 +498,7 @@ def plot_co_pse_auc(data_by_loc, saving_path):
     plt.close(fig)
 
 # 4 Machine learning ROCs
-def ml_training_plot(target_patients, loc_name, hfo_type, roc=True,
+def ml_training_plot_old(target_patients, loc_name, hfo_type, roc=True,
                      pre_rec=False, models_to_run=models_to_run,
                      saving_dir=exp_save_path[4]['dir']):
     from ml_hfo_classifier import gather_folds, print_metrics
@@ -555,6 +555,57 @@ def ml_training_plot(target_patients, loc_name, hfo_type, roc=True,
     plt.show()
     plt.close(fig)
 
+def ml_training_plot(data_by_model, loc_name, hfo_type,
+                     roc=True, pre_rec=False,
+                     saving_dir=exp_save_path[4]['dir']):
+
+    fig = plt.figure()
+    fig.suptitle('SOZ HFO classfiers training in {0}'.format(loc_name),
+                 fontsize=16)
+    models_to_run = list(data_by_model.keys())
+    plot_axe = axes_by_model(plt, models_to_run)
+    for model_name in models_to_run:
+        # Plot ROC curve
+        curve_kind = 'ROC'
+        labels = data_by_model[model_name]['y']
+        probs = data_by_model[model_name]['probas']
+        fpr, tpr, thresholds = metrics.roc_curve(labels , probs)
+        youden = youden(fpr, tpr, thresholds)
+        plot_axe[model_name][curve_kind].plot(fpr, tpr, lw=1, alpha=0.8,
+                                         label='AUC = %0.2f. Youden = %0.2f' %
+                                        (metrics.auc(fpr, tpr), youden) )
+        plot_axe[model_name][curve_kind].plot([0, 1], [0, 1], linestyle='--',
+                                         lw=2, color='r', label='Chance',
+                                         alpha=.8)
+        set_titles('False Positive Rate', 'True Postive Rate', model_name,
+                   plot_axe[model_name][curve_kind])
+
+        # PRE REC
+        precision, recall, thresholds = metrics.precision_recall_curve(labels,
+                                                               probs)
+        precision = np.array(list(reversed(list(precision))))
+        recall = np.array(list(reversed(list(recall))))
+        #thesholds = np.array(list(reversed(list(thresholds))))
+        ap = metrics.average_precision_score(labels, probs)
+        auc_val = metrics.auc(recall, precision)
+        curve_kind= 'PRE_REC'
+        plot_axe[model_name][curve_kind].plot(recall, precision, color='b',
+                                              label='AUC = %0.2f. AP = %0.2f' % (
+                                                  auc_val, ap),
+                                              lw=2, alpha=.8)
+        set_titles('Recall', 'Precision', model_name,
+                   plot_axe[model_name][curve_kind])
+
+    # Saving the figure
+    saving_path = str(Path(saving_dir, loc_name, hfo_type, 'ml_train_plot'))
+    for fmt in ['pdf', 'png']:
+        saving_path_f = '{file_path}.{format}'.format(file_path=saving_dir,
+                                                      format=fmt)
+        if fmt == 'pdf':
+            print('ROC saving path: {0}'.format(saving_path_f))
+        plt.savefig(saving_path_f, bbox_inches='tight')
+    plt.show()
+    plt.close(fig)
 
 def feature_importances(feature_list, importances, hfo_type_name):
     fig = plt.figure()

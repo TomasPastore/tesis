@@ -7,7 +7,7 @@ import pandas as pd
 from imblearn.combine import SMOTETomek  # doctest: +NORMALIZE_WHITESPACE
 from imblearn.under_sampling import RepeatedEditedNearestNeighbours, \
     NeighbourhoodCleaningRule
-from sklearn.preprocessing import RobustScaler, StandardScaler
+from sklearn.preprocessing import StandardScaler
 
 from utils import load_json, save_json
 from config import VALIDATION_NAMES_BY_LOC_PATH
@@ -185,17 +185,13 @@ def build_folds(hfo_type_name, model_patients, target_patients, test_partition):
         feature_names = test_features_pd.columns  # adds sin and cos for PAC
         train_features, test_features = train_features_pd.values, test_features_pd.values
 
-        # TODO review scaler
-        # scaler = RobustScaler()  # Scale features using statistics that are
-        # robust to outliers.
-        # Tengo que guardar el scaler para validacion todo
         scaler = StandardScaler()
         balance = False
         if balance:
             # Resampling and balancing classes
-            train_features, train_labels = balance_samples(train_features, train_labels)
             train_features = scaler.fit_transform(train_features)
             test_features = scaler.transform(test_features)
+            train_features, train_labels = balance_samples(train_features, train_labels)
         else:
             # Scaling (comment if balance is enable)
             # train_features = scaler.fit_transform(train_features)
@@ -236,7 +232,6 @@ def ml_field_names(hfo_type_name, include_coords=False):
     return field_names
 
 
-# TODO probar la varianza o mean del feature en el electrodo como nuevo feature
 def get_features_and_labels(patients, hfo_type_name, field_names):
     pac = [f for f in field_names if 'angle' in f or 'vs' in f]
     features = []
@@ -260,7 +255,7 @@ def get_features_and_labels(patients, hfo_type_name, field_names):
                     features.append(feature_row_i)
                     labels.append(h.info['soz'])
 
-    return features, np.array(labels)  # returns dict, np.array, list
+    return features, np.array(labels)  # returns np.array, list
 
 # Reviewed
 def patients_with_more_than(count, patients_dic, hfo_type_name):

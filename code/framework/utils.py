@@ -2,6 +2,7 @@
 import copy
 import math as mt
 import time
+import random
 from itertools import chain, combinations
 from sys import version as py_version
 import json
@@ -51,6 +52,11 @@ def log(msg=None, msg_type=None, patient=None, electrode=None):
 
             LOG[patient][electrode][msg_type] += 1
 
+# Mapea aleatoriamente de los patient ids a 1 .. n
+def map_pat_ids(model_patients):
+   patient_names= [p.id for p in model_patients]
+   random.shuffle(patient_names)
+   return [patient_names.index(p.id)+1 for p in model_patients]
 
 def unique_patients(collection, crit):
     cursor = collection.find(crit)

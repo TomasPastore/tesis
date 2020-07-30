@@ -11,7 +11,9 @@ warnings.filterwarnings("ignore", module="matplotlib")
 warnings.simplefilter(action='ignore', category=FutureWarning)
 from config import (EVENT_TYPES, HFO_TYPES, exp_save_path)
 from db_parsing import preference_locs, all_loc_names
-from ml_hfo_classifier import ml_hfo_classifier
+from ml_hfo_classifier import ml_hfo_classifier, \
+    ml_hfo_classifier_sk_learn_train
+
 running_py_3_5 = py_version[2] == '5'
 if running_py_3_5:
     pass
@@ -293,8 +295,8 @@ class Driver():
                     patients_dic = data_by_loc[location]['patients_dic'] #ya
                     # filtrado el diccionario de pacientes en loc
                     for hfo_type in evt_types_to_load:
-                        #if hfo_type in []:
-                        #    continue
+                        if hfo_type in ['RonO']:
+                            continue
                         ml_hfo_classifier_sk_learn_train(patients_dic,
                                                          location=location,
                                                          #solo para saber en
