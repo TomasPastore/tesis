@@ -1,5 +1,5 @@
 from config import EVENT_TYPES, HFO_TYPES, models_to_run
-
+from random import choices
 class Electrode():
 
     def __init__(self, name, soz, blocks, x, y, z,
@@ -48,6 +48,21 @@ class Electrode():
             for block, count in self.evt_count[event_type].items():
                 result += count
         return result
+
+    # Warning call to flush_cache after removing from electrodes
+    def remove_rand_evt(self, hfo_type, art_radius=20):
+        if hfo_type == 'Fast RonO':
+            artifact_freq = 300 #Hz
+            candidates_idx = []
+            for i, evt in enumerate(self.events[hfo_type], start=0):
+                if (artifact_freq - art_radius) <= evt.info['freq_av'] and \
+                    evt.info['freq_av'] <= (artifact_freq + art_radius):
+                    candidates_idx.append(i)
+            assert(len(candidates_idx) > 0)
+            idx_to_rmv = choices(candidates_idx, k=1)[0]
+            self.events[hfo_type].pop(idx_to_rmv)
+        else:
+            raise NotImplementedError('HFO type not implemented')
 
     def flush_cache(self, event_types):
         for event_type in event_types:

@@ -77,8 +77,7 @@ def load_patients(electrodes_collection, evt_collection, intraop,
                                                    restrict_to_tagged_locs)
 
         if loc_name == 'Whole Brain' and remove_elec_artifacts:
-            print('\nK means filter for FronO and RonO electrical '
-                  'artifacts')
+
             from ml_hfo_classifier import artifact_filter
 
             for hfo_type in ['Fast RonO']:

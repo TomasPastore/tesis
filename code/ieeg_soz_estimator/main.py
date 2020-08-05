@@ -34,8 +34,8 @@ def main(interactive_exp_menu=False):
             unittest.main(tests, exit=False)
 
         # Experiment list for the driver:
-        exp_driver.run_experiment( number=2, roman_num='i', letter='b')
-        #FRonO_paper(elec_collection, evt_collection)
+        #exp_driver.run_experiment( number=2, roman_num='i', letter='b')
+        FRonO_paper(elec_collection, evt_collection)
 
 
 def experiment_menu(exp_driver):

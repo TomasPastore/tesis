@@ -1,6 +1,8 @@
 import copy
-
+from pathlib import Path
+import pandas as pd
 import numpy as np
+import math as mt
 from sklearn.metrics import roc_curve
 import progressbar
 import graphics
@@ -9,18 +11,19 @@ from sklearn.metrics import confusion_matrix, classification_report
 from sklearn.model_selection import GroupShuffleSplit
 from partition_builder import patients_with_more_than, build_patient_sets, \
     build_folds
+from soz_predictor import region_info
 from utils import map_pat_ids
 from sklearn.pipeline import make_pipeline
 from sklearn.model_selection import cross_val_score, cross_validate, cross_val_predict
 from sklearn import preprocessing, metrics
 from partition_builder import pull_apart_validation_set, ml_field_names
 from xgboost.sklearn import XGBClassifier
-
+from random import choices
 #TODO
 def compare_Hippocampal_RonS_ml_models(elec_collection, evt_collection):
     models_to_run = ['XGBoost', 'Random Forest', 'Bayes']
-    ml_phfo_models(elec_collection, evt_collection, 'Hippocampus', 'RonS',
-                   tol_fprs=[0.6], models_to_run=models_to_run)
+    #ml_phfo_models(elec_collection, evt_collection, 'Hippocampus', 'RonS',
+    #               tol_fprs=[0.6], models_to_run=models_to_run)
 
 
 # Reviewed
@@ -39,7 +42,6 @@ def compare_baseline_vs_ml(patients_dic, #Patients that built the baseline
                                        use_coords, target_patients_id,
                                        ml_models, sim_recall, saving_path)
 
-    event_type_data_by_loc = {location: {}}
     for model_name in ml_models:
 
         simulating = sim_recall is not None
@@ -52,8 +54,7 @@ def compare_baseline_vs_ml(patients_dic, #Patients that built the baseline
         labels, preds, probs = gather_folds(model_name, hfo_type,
                                             target_patients, estimator=np.mean)
 
-        print('Displaying metrics for {t} in {l} ml HFO classifier using {'
-              'm}'.format(t=hfo_type, l=location, m=model_name))
+        print('Displaying metrics for {t} in {l} ml HFO classifier using {m}'.format(t=hfo_type, l=location, m=model_name))
         print_metrics(model_name, hfo_type, labels, preds, probs)
 
         # SOZ HFO RATE MODEL
@@ -66,7 +67,7 @@ def compare_baseline_vs_ml(patients_dic, #Patients that built the baseline
                                                   thresh=thresh,
                                                   model_name=model_name)
 
-            reg_loc = loc_name if loc_name != 'Whole Brain' else None
+            reg_loc = location if location != 'Whole Brain' else None
             loc_info = region_info(filtered_pat_dic,
                                      event_types =[hfo_type],
                                      flush =True,  # el flush es importante
@@ -80,22 +81,11 @@ def compare_baseline_vs_ml(patients_dic, #Patients that built the baseline
             plot_data_by_loc[location][fig_model_name] = loc_info
 
     comp_with = ''  # DONT remember why was this, i think that for colors in simu
-    graphics.event_rate_by_loc(event_type_data_by_loc,
-                               metrics=['pse', 'pnee', 'auc'],
-                               roc_saving_path=str(Path(saving_path,
-                                                        'loc_{g}'.format(
-                                                            g=granularity),
-                                                        '3_iii_sleep_tagged')),
-                               change_tab_path=True)
-
     graphics.event_rate_by_loc(plot_data_by_loc,
                                metrics=['pse', 'pnee', 'auc'],
-                               title='HFO rate baseline VS ML pHFO filters: {'
-                                     't} in {l}'.format(t=hfo_type, l=location),
+                               title='HFO rate baseline VS ML pHFO filters: {t} in {l}'.format(t=hfo_type, l=location),
                                roc_saving_path = str(Path(saving_path,
-                               'loc_{g}'.format(
-                                   g=granularity),
-                               '3_iii_sleep_tagged')),
+                                                        location,'roc')),
                                colors='random' if comp_with == '' else None,
                                conf=sim_recall)
 
@@ -148,8 +138,8 @@ def ml_hfo_classifier(patients_dic, location, hfo_type, use_coords,
                   models=ml_models, sim_recall=sim_recall)
 
     plot = graphics.ml_training_plot(target_patients, location, hfo_type, roc=True,
-                                     pre_rec=True, models_to_run=ml_models,
-                                     saving_dir=saving_dir)
+                                     pre_rec=True, saving_dir=saving_dir)
+
     # Esto incluye a los excluidos por cuantil con todos sus eventos sin filtro
     for pat_id, p in excluded_pat.items():
         for e in p.electrodes:
@@ -322,6 +312,7 @@ def phfo_filter(hfo_type_name, patients_dic, target=None, tolerated_fpr=None,
                                                                          patients_dic)
     thresh = None
     model_name = 'XGBoost'
+    perfect = False
     if not perfect:
         folds = build_folds(hfo_type_name, model_patients, target_patients,
                             test_partition)
@@ -336,13 +327,14 @@ def phfo_filter(hfo_type_name, patients_dic, target=None, tolerated_fpr=None,
 
     # solo considero phfo a los que tengan un prob de thresh o mas
     filtered_pat_dic = phfo_thresh_filter(target_patients, hfo_type_name,
-                                          thresh=thresh, perfect=perfect,
+                                          thresh=thresh,
                                           model_name=model_name)
-
+    '''
     if 'model_pat' not in target or 'validation_pat' not in target:
         # We add again the patients that wouldn't be considered for the ml
         for p_name, p in skipped_patients.items():
             filtered_pat_dic[p_name] = p
+    '''
     return filtered_pat_dic
 
 
@@ -525,43 +517,82 @@ def print_metrics(model, hfo_type_name, y_test, y_pred, y_probs):
 
 
 
+# TODO flush evt count after filter
+# predictors = ['freq_av', 'duration', 'power_pk']
+# data = {predictor: [] for predictor in predictors}
+#for pred in predictors:
+#    data[pred].append(evt.info[pred])
+# Note: Maybe using meadian would be better since the mean gets more
+        # affected
+        # by outliers
+# graphics.k_means_clusters_plot(data)
+
+
 def artifact_filter(hfo_type, patients_dic):
     '''
-    functionality: filter Fast RonO near 300 HZ and RonO near 180 HZ
-    electrical artifacts.
+    Filters Fast RonO near 300 HZ and RonO near 180 Hz electrical artifacts.
     :param hfo_type: The hfo type with electrical artifacts
     :param patients_dic: Patient, Electrode, Event data structures
     :return: modified patients dic for type hfo_type
-    # TODO flush evt count after filter
     '''
-    # recorrer pacientes y mirar art y harm count
-    # tomar mean de pacientes
-    # recorrer pacientes y mientras los electrodos ten
+    print('Entering filter for electrical artifacts')
+    remove_from_elec_by_pat = {p_name: [] for p_name in patients_dic.keys()}
+    # For each patient I keep a list of elec names where we can gradually
+    # remove candidates and update
     if hfo_type == 'Fast RonO':
         artifact_freq = 300 # HZ
-        std = 20 # hz Looking to the histogram this may be to big
+        art_radius = 20 # hz
         pw_line_int = 60 # HZ
-        # predictors = ['freq_av', 'duration', 'power_pk']
-        # data = {predictor: [] for predictor in predictors}
-        for p in patients_dic.values():
-            artifact_count = 0
-            harmonic_count = 0
+        artifact_cnts = dict() # 300 HZ +- art_radius event counts for each patient
+        physio_cnts = [] # 360 HZ +- art_radius event counts for each patient
+        for p_name, p in patients_dic.items():
+            artifact_cnt = 0
+            physio_cnt = 0
             for e in p.electrodes:
                 for evt in e.events['Fast RonO']:
-                    if (artifact_freq - std) <= evt.info['freq_av'] and \
-                        evt.info['freq_av'] <= (artifact_freq + std):
-                        artifact_count += 1
-                    elif (artifact_freq + pw_line_int - std) <= \
-                    evt.info['freq_av'] and \
-                    evt.info['freq_av'] <= (artifact_freq + pw_line_int + std):
-                        harmonic_count += 1
+                    if (artifact_freq - art_radius) <= evt.info['freq_av'] and \
+                            evt.info['freq_av'] <= (artifact_freq + art_radius):
+                        artifact_cnt += 1
+                        remove_from_elec_by_pat[p_name].append(e.name)
 
-                    for pred in predictors:
-                        data[pred].append(evt.info[pred])
-        graphics.k_means_clusters_plot(data)
+                    elif (artifact_freq + pw_line_int - art_radius) <= evt.info['freq_av'] and \
+                            evt.info['freq_av'] <= (artifact_freq + pw_line_int + art_radius):
+                        physio_cnt += 1
+            artifact_cnts[p_name] = artifact_cnt
+            physio_cnts.append(physio_cnt)
+
+        # Saving stats
+        artifact_mean = sum(list(artifact_cnts.values())) / (len(
+            artifact_cnts.keys())-1)
+        artifact_std = np.std(list(artifact_cnts.values()), ddof=1)
+        physio_mean = sum(physio_cnts) / (len(physio_cnts)-1)
+        physio_std = np.std(physio_cnts, ddof=1)
+        print('-----------------------------------')
+        print('\nFRonO Artifacts (300 HZ +- {0})'.format(art_radius))
+        print('Sample artifact mean', artifact_mean)
+        print('Sample artifact std', artifact_std)
+        print('\nFRonO Phisiological (360 HZ +- {0})'.format(art_radius))
+        print('Sample physiological mean', physio_mean)
+        print('Sample phisiological std', physio_std)
+        print('-----------------------------------')
+        # Removing artifacts
+        for p_name, p in patients_dic.items():
+            remove_cnt = max(0, int(artifact_cnts[p_name] - physio_mean) )
+            print('For patient {0} we remove {1} events'.format(p_name,
+                                                                remove_cnt))
+            for i in range(remove_cnt):
+                elec_to_rmv = choices(remove_from_elec_by_pat[p_name], k=1)[0]
+                remove_from_elec_by_pat[p_name].remove(elec_to_rmv)
+                electrode = p.get_electrode(elec_to_rmv)
+                electrode.remove_rand_evt(hfo_type='Fast RonO', art_radius=art_radius)
+
+            for e in p.electrodes:
+                e.flush_cache(['Fast RonO']) #Recalc events counts for hfo rate
+
     else:
         print('Not implemented filter type')
         raise NotImplementedError()
+
     return patients_dic
 
 

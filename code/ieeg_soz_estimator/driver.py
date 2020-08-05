@@ -34,7 +34,7 @@ class Driver():
             scratch.print_non_intraop_patients(self.elec_collection,
                                                self.evt_collection)
 
-            #TODO mention untagged data and discard untagged to simplify
+            # TODO mention untagged data and discard untagged to simplify
             # TODO update table with True True
             # Get global data such as event count, elec count, in whole brain
             scratch.global_info_in_locations(self.elec_collection,
