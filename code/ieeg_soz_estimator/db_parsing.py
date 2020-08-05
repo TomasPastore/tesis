@@ -79,10 +79,10 @@ def load_patients(electrodes_collection, evt_collection, intraop,
         if loc_name == 'Whole Brain' and remove_elec_artifacts:
             print('\nK means filter for FronO and RonO electrical '
                   'artifacts')
-            from ml_hfo_classifier import k_means_filter
+            from ml_hfo_classifier import artifact_filter
 
             for hfo_type in ['Fast RonO']:
-                patients_dic = k_means_filter(hfo_type, patients_dic)
+                patients_dic = artifact_filter(hfo_type, patients_dic)
 
         patients_by_loc[loc_name] = patients_dic
 

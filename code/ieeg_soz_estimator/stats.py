@@ -106,7 +106,7 @@ def feature_statistical_tests(patients_dic,
     granularity = get_granularity(location)
     # Gathering data
     for p in patients_dic.values():
-        if location is None:
+        if location is None or location == 'Whole Brain':
             electrodes = p.electrodes
         else:
             electrodes = [e for e in p.electrodes if

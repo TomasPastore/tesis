@@ -101,9 +101,9 @@ def plot_feature_distribution(soz_data, nsoz_data, feature, type, stats,
     saving_dir = str(Path(saving_dir, feature, type))
     Path(saving_dir).mkdir(0o777, parents=True, exist_ok=True)
     fig_path = str(Path(saving_dir, feature + '_distr.pdf'))
-    print('Distribution saving path: {0}'.format(fig_path))
-    print('Plotting feature:{f} for type:{t}'.format(
-        f=feature, t=type))
+    #print('Distribution saving path: {0}'.format(fig_path))
+    #print('Plotting feature:{f} for type:{t}'.format(
+    #    f=feature, t=type))
     import seaborn as sns
     sns.set_style("white")
     # Plot

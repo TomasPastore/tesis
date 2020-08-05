@@ -34,7 +34,7 @@ def main(interactive_exp_menu=False):
             unittest.main(tests, exit=False)
 
         # Experiment list for the driver:
-        exp_driver.run_experiment( number=4, roman_num='ii', letter='a')
+        exp_driver.run_experiment( number=2, roman_num='i', letter='b')
         #FRonO_paper(elec_collection, evt_collection)
 
 
@@ -55,18 +55,18 @@ def experiment_menu(exp_driver):
         # localized and whole brain regions
         go_to_menu_after(5, exp_driver)
     elif option == 2:
-        exp_driver.run_experiment(number=2, roman_num='i', letter='') #whole
-        # brain untagged
+        exp_driver.run_experiment(number=2, roman_num='i', letter='b') #whole
+        # brain tagged
         exp_driver.run_experiment(number=2, roman_num='ii') #localized
         go_to_menu_after(5, exp_driver)
     elif option == 3:
-        #exp_driver.run_experiment(number=3, roman_num='0') # whole brain HFOs
+        exp_driver.run_experiment(number=3, roman_num='0') # whole brain HFOs
         # together
-        #exp_driver.run_experiment(number=3, roman_num='i', letter='a') #whole
+        exp_driver.run_experiment(number=3, roman_num='i', letter='a') #whole
         # brain untagged
-        #exp_driver.run_experiment(number=3, roman_num='i', letter='b') #whole
+        exp_driver.run_experiment(number=3, roman_num='i', letter='b') #whole
         # brain tagged
-        #exp_driver.run_experiment(number=3, roman_num='ii') # PSE AUC relation
+        exp_driver.run_experiment(number=3, roman_num='ii') # PSE AUC relation
         exp_driver.run_experiment(number=3, roman_num='iii') # localized
         go_to_menu_after(5, exp_driver)
 

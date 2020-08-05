@@ -142,7 +142,7 @@ exp_save_path[4] = dict()
 exp_save_path[4]['dir'] = str(Path(EXPERIMENTS_FOLDER, '4_ml_hfo_classifiers'))
 
 VALIDATION_NAMES_BY_LOC_PATH = str( Path(TESIS_ROOT_DIR,
-                                         'code/framework',
+                                         'code/ieeg_soz_estimator',
                                          'validation_names_by_loc.json'))
 exp_save_path[4]['i'] = dict()
 exp_save_path[4]['i']['a'] = str(Path(exp_save_path[4]['dir'],

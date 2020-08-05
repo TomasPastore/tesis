@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/../framework/.idea/phfo_engine.iml" filepath="$PROJECT_DIR$/../framework/.idea/phfo_engine.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../ieeg_soz_estimator/.idea/phfo_engine.iml" filepath="$PROJECT_DIR$/../ieeg_soz_estimator/.idea/phfo_engine.iml" />
     </modules>
   </component>
 </project>

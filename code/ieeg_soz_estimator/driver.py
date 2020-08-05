@@ -34,6 +34,8 @@ class Driver():
             scratch.print_non_intraop_patients(self.elec_collection,
                                                self.evt_collection)
 
+            #TODO mention untagged data and discard untagged to simplify
+            # TODO update table with True True
             # Get global data such as event count, elec count, in whole brain
             scratch.global_info_in_locations(self.elec_collection,
                                              self.evt_collection,
@@ -42,7 +44,9 @@ class Driver():
                                              event_type_names=HFO_TYPES + [
                                                  'Spikes'],
                                              restrict_to_tagged_coords=False,
+                                             #TODO update with True
                                              restrict_to_tagged_locs=False,
+                                             #TODO idem above
                                              saving_path=str(
                                                  Path(exp_save_path[1],
                                                       'whole_brain_table')))
@@ -63,16 +67,16 @@ class Driver():
         elif number == 2:
             if roman_num == 'i':
                 print('\nRunning data analysis for Whole Brain')
-                if letter == 'a':
+                if letter == 'a':#TODO remove  a b
                     print('Coords Untagged allowed')
                     restrict_to_tagged_coords = False
                     restrict_to_tagged_locs = False
                     locations = {0: ['Whole Brain']}
                     saving_dir = exp_save_path[2]['i']['a']
-                elif letter =='b':
-                    print('Coords Tagged requiered')
+                elif letter =='b': # TODO rerun
+                    print('Coords Tagged required')
                     restrict_to_tagged_coords = True
-                    restrict_to_tagged_locs = False
+                    restrict_to_tagged_locs = True
                     locations = {0: ['Whole Brain']}
                     saving_dir = exp_save_path[2]['i']['b']
                 else:
@@ -110,7 +114,7 @@ class Driver():
                          locs]
             # Esto no cambia con lo de kmeans, quizas algun path
             stats = dict()
-            for loc, locs in locations:
+            for loc, locs in locations.items():
                 for location in locs:
                     saving_dir_feat = saving_dir if location == 'Whole ' \
                                                               'Brain' \
@@ -142,11 +146,11 @@ class Driver():
                     )
 
             # Stat tables
-            for feature in set(['HFO rate']+
+            for feature in set(['HFO_rate']+
                                ml_field_names('RonO')+
                                ml_field_names('RonS')):
                 #TODO for every feature
-                if feature == 'HFO rate':
+                if feature == 'HFO_rate':
                     columns, rows = build_stat_table(
                         locations=location_names,
                         feat_name=feature,
@@ -293,7 +297,7 @@ class Driver():
             for locs in locations.values():
                 for location in locs:
                     patients_dic = data_by_loc[location]['patients_dic'] #ya
-                    # filtrado el diccionario de pacientes en loc
+                    print('Patients in {loc}: {p}'.format(location, patients_dic))
                     for hfo_type in evt_types_to_load:
                         if hfo_type in ['RonO']:
                             continue

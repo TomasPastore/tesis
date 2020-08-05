@@ -519,25 +519,43 @@ def print_metrics(model, hfo_type_name, y_test, y_pred, y_probs):
     print('-------------------------------------------')
     print('')
 
-def k_means_filter(hfo_type, patients_dic):
-    '''
-    Aims to filter RonO in 180 HZ and Fast RonO in 300 HZ electrical artifacts.
-    Uses freq_av, power_pk, duration (ms) to train kmeans and then ranks the
-    most noisy clusters and removes those events.
 
+# Como se guardan iterando patients_dic.values despues hay que
+# iterarlo igual y crear un diccionario copia sin alterar el viejo
+
+
+
+def artifact_filter(hfo_type, patients_dic):
+    '''
+    functionality: filter Fast RonO near 300 HZ and RonO near 180 HZ
+    electrical artifacts.
     :param hfo_type: The hfo type with electrical artifacts
-    :param patients_dic:
+    :param patients_dic: Patient, Electrode, Event data structures
     :return: modified patients dic for type hfo_type
     # TODO flush evt count after filter
     '''
+    # recorrer pacientes y mirar art y harm count
+    # tomar mean de pacientes
+    # recorrer pacientes y mientras los electrodos ten
     if hfo_type == 'Fast RonO':
-        predictors = ['freq_av', 'duration', 'power_pk']
-        data = {predictor: [] for predictor in predictors}
-        #Como se guardan iterando patients_dic.values despues hay que
-        # iterarlo igual y crear un diccionario copia sin alterar el viejo
+        artifact_freq = 300 # HZ
+        std = 20 # hz Looking to the histogram this may be to big
+        pw_line_int = 60 # HZ
+        # predictors = ['freq_av', 'duration', 'power_pk']
+        # data = {predictor: [] for predictor in predictors}
         for p in patients_dic.values():
+            artifact_count = 0
+            harmonic_count = 0
             for e in p.electrodes:
-                for evt in e.events[hfo_type]:
+                for evt in e.events['Fast RonO']:
+                    if (artifact_freq - std) <= evt.info['freq_av'] and \
+                        evt.info['freq_av'] <= (artifact_freq + std):
+                        artifact_count += 1
+                    elif (artifact_freq + pw_line_int - std) <= \
+                    evt.info['freq_av'] and \
+                    evt.info['freq_av'] <= (artifact_freq + pw_line_int + std):
+                        harmonic_count += 1
+
                     for pred in predictors:
                         data[pred].append(evt.info[pred])
         graphics.k_means_clusters_plot(data)
