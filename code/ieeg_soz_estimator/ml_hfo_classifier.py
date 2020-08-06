@@ -551,29 +551,32 @@ def artifact_filter(hfo_type, patients_dic):
             for e in p.electrodes:
                 for evt in e.events['Fast RonO']:
                     if (artifact_freq - art_radius) <= evt.info['freq_av'] and \
-                            evt.info['freq_av'] <= (artifact_freq + art_radius):
+                            evt.info['freq_av'] <= (artifact_freq + \
+                            art_radius):
                         artifact_cnt += 1
                         remove_from_elec_by_pat[p_name].append(e.name)
 
                     elif (artifact_freq + pw_line_int - art_radius) <= evt.info['freq_av'] and \
-                            evt.info['freq_av'] <= (artifact_freq + pw_line_int + art_radius):
+                            evt.info['freq_av'] <= (artifact_freq +
+                                                    pw_line_int + art_radius):
                         physio_cnt += 1
             artifact_cnts[p_name] = artifact_cnt
             physio_cnts.append(physio_cnt)
 
         # Saving stats
-        artifact_mean = sum(list(artifact_cnts.values())) / (len(
-            artifact_cnts.keys())-1)
+        artifact_mean = np.mean(list(artifact_cnts.values()))
+        #artifact_mean = np.median(list(artifact_cnts.values()))
         artifact_std = np.std(list(artifact_cnts.values()), ddof=1)
-        physio_mean = sum(physio_cnts) / (len(physio_cnts)-1)
+        physio_mean = np.mean(physio_cnts)
+        #physio_mean = np.median(list(physio_cnts))
         physio_std = np.std(physio_cnts, ddof=1)
         print('-----------------------------------')
         print('\nFRonO Artifacts (300 HZ +- {0})'.format(art_radius))
         print('Sample artifact mean', artifact_mean)
         print('Sample artifact std', artifact_std)
-        print('\nFRonO Phisiological (360 HZ +- {0})'.format(art_radius))
+        print('\nFRonO Physiological (360 HZ +- {0})'.format(art_radius))
         print('Sample physiological mean', physio_mean)
-        print('Sample phisiological std', physio_std)
+        print('Sample physiological std', physio_std)
         print('-----------------------------------')
         # Removing artifacts
         for p_name, p in patients_dic.items():

@@ -15,7 +15,7 @@ from config import EVENT_TYPES, intraop_patients, HFO_TYPES, color_list, \
 running_py_3_5 = py_version[2] == '5'
 if running_py_3_5:
     import angle_clusters
-from db_parsing import get_granularity
+from db_parsing import get_granularity, parse_elec_name
 
 
 # mplstyle.use(['ggplot', 'fast'])

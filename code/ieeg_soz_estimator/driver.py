@@ -105,14 +105,14 @@ class Driver():
                                   HFO_TYPES],
                 locations=locations,
                 saving_dir=saving_dir,
-                return_pat_dic_by_loc=True
+                return_pat_dic_by_loc=True,
+                remove_elec_artifacts=True #TESTING TODO
             )
 
             print('\nFeatures and HFO rate distributions SOZ vs NSOZ')
 
             location_names = [loc for locs in locations.values() for loc in \
                          locs]
-            # Esto no cambia con lo de kmeans, quizas algun path
             stats = dict()
             for loc, locs in locations.items():
                 for location in locs:
@@ -313,7 +313,7 @@ class Driver():
                                                          saving_dir=saving_dir)
         elif number == 5:
             # 5) pHFOs rate VS HFO rate baseline
-            # TODO week 12/7
+            # TODO
             raise NOT_IMPLEMENTED_EXP
             # phfo_rate_vs_baseline_whole_brain(self.elec_collection,
             # self.evt_collection,
@@ -331,7 +331,7 @@ class Driver():
         # TODO
         #  mencionar en discusion de resultados de la comparacion de baseline vs ml filters
         elif number == 6:
-            # TODO week 19/7
+            # TODO
             raise NOT_IMPLEMENTED_EXP
             # 6) Simulation of the ml predictor to understand needed performance to
             # improve HFO rate baseline
