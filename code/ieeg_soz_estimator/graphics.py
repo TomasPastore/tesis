@@ -10,8 +10,8 @@ from matplotlib import pyplot as plt
 from mpl_toolkits import mplot3d
 from sklearn import metrics
 from config import EVENT_TYPES, intraop_patients, HFO_TYPES, color_list, \
-    models_to_run, EXPERIMENTS_FOLDER, orca_executable, exp_save_path
-
+     EXPERIMENTS_FOLDER, orca_executable, exp_save_path
+from ml_algorithms import models_to_run
 running_py_3_5 = py_version[2] == '5'
 if running_py_3_5:
     import angle_clusters
@@ -499,8 +499,9 @@ def plot_co_pse_auc(data_by_loc, saving_path):
 
 # 4 Machine learning ROCs
 def ml_training_plot_old(target_patients, loc_name, hfo_type, roc=True,
-                     pre_rec=False, models_to_run=models_to_run,
-                     saving_dir=exp_save_path[4]['dir']):
+                     pre_rec=False, models_to_run,
+                     saving_dir=exp_from ml_algorithms import models_to_runsave_path[4][
+    'dir']):
     from ml_hfo_classifier import gather_folds, print_metrics
 
     fig = plt.figure()

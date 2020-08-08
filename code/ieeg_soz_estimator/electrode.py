@@ -1,4 +1,4 @@
-from config import EVENT_TYPES, HFO_TYPES, models_to_run
+from config import EVENT_TYPES, HFO_TYPES
 from random import choices
 class Electrode():
 

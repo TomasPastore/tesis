@@ -192,3 +192,17 @@ def generate_trees(feature_list, train_features, train_labels,
                         precision=1)
         (graph,) = pydot.graph_from_dot_file(out_path)
         graph.write_png('{dir}/thesis_tree_{k}.png'.format(dir=directory, k=i))
+
+
+################################################################################
+
+# Default global var of the models of ml to run
+models_to_run = ['XGBoost']  # 'Balanced random forest''Linear SVM'
+models_dic = {'XGBoost': xgboost,
+              'Linear SVM': svm_m,
+              'Random Forest': random_forest,
+              'Balanced random forest': balanced_random_forest,
+              'SGD': sgd,
+              'Bayes': naive_bayes,
+              'Simulated': simulator
+              }

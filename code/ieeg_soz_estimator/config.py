@@ -1,8 +1,5 @@
 from pathlib import Path
 
-from ml_algorithms import naive_bayes, random_forest, svm_m, balanced_random_forest, \
-    xgboost, sgd, simulator
-
 DEBUG = True
 LOG = {}
 TEST_BEFORE_RUN = False
@@ -11,21 +8,7 @@ TEST_BEFORE_RUN = False
 type_names_to_run = ['RonS']  # default value
 # type_names_to_run =  ['RonO', 'RonS', 'Fast RonO', 'Fast RonS']
 
-# Global var of the models of ml to run, XGBoost default
-models_to_run = ['XGBoost']  # 'Balanced random forest''Linear SVM'
-# 'Simulated'
-models_to_run_obj = [xgboost]  # The python objects of the sklearn class
-models_dic = {'XGBoost': xgboost,
-              'Linear SVM': svm_m,
-              'Random Forest': random_forest,
-              'Balanced random forest': balanced_random_forest,
-              'SGD': sgd,
-              'Bayes': naive_bayes,
-              'Simulated': simulator
-              }
-
-EVENT_TYPES = ['RonO', 'RonS', 'Spikes', 'Fast RonO', 'Fast RonS', 'Sharp '
-                                                                   'Spikes']
+EVENT_TYPES = ['RonO', 'RonS', 'Spikes', 'Fast RonO', 'Fast RonS', 'Sharp Spikes']
 HFO_TYPES = ['Fast RonO', 'Fast RonS', 'RonO', 'RonS']
 HFO_SUBTYPES = ['delta', 'theta', 'slow', 'spindle', 'spike']  # alpha, beta,
 # gamma.?

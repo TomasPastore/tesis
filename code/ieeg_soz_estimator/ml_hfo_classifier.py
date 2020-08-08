@@ -438,13 +438,6 @@ def param_tuning(hfo_type_name, patients_dic):
             config_result[id]['preds'] = config_result[id]['preds'] + list(test_predictions)
             config_result[id]['probs'] = config_result[id]['probs'] + list(test_probs)
 
-    # Busco la config que tiene mejor metrica
-    # Ver con Diego cual usar AP, f1score
-    best_id = 1
-    for id, result in config_result.items():  # probar si f1score da igual con probs y preds, ver si usa 0.5 simulando preds con ese thresh, si es eso podemos cambiar las preds segun un thresh
-        average_precision = average_precision_score(labels, result['probs'])
-        if average_precision > average_precision_score(labels, config_result[best_id]['probs']):
-            best_id = id
 
 def grid_search(alg, param_test, folds, fit_features, to_labels):
      gsearch = GridSearchCV(estimator=alg,
@@ -517,16 +510,11 @@ def print_metrics(model, hfo_type_name, y_test, y_pred, y_probs):
 
 
 
-# TODO flush evt count after filter
 # predictors = ['freq_av', 'duration', 'power_pk']
 # data = {predictor: [] for predictor in predictors}
-#for pred in predictors:
+# for pred in predictors:
 #    data[pred].append(evt.info[pred])
-# Note: Maybe using meadian would be better since the mean gets more
-        # affected
-        # by outliers
 # graphics.k_means_clusters_plot(data)
-
 
 def artifact_filter(hfo_type, patients_dic):
     '''
