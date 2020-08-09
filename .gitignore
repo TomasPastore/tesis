@@ -1,6 +1,7 @@
-experiments/
+#figures/
 graphics.old/
 code/scratch/
+
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

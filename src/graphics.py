@@ -1,0 +1,775 @@
+import math as mt
+from decimal import Decimal
+from pathlib import Path
+import numpy as np
+import plotly.graph_objects as go
+from matplotlib import pyplot as plt
+from mpl_toolkits import mplot3d
+from sklearn import metrics
+from conf import FIG_FOLDER_DIR, ORCA_EXECUTABLE, FIG_SAVE_PATH, \
+    ML_MODELS_TO_RUN
+
+from db_parsing import get_granularity, parse_elec_name, EVENT_TYPES, \
+    intraop_patients, HFO_TYPES
+
+# mplstyle.use(['ggplot', 'fast'])
+
+# TODO MOVE TO DB PARSING
+def encode_type_name(name):
+    return str(EVENT_TYPES.index(name) + 1)
+
+# Reviewed
+# 1) Global info by location table
+def plot_global_info_by_loc_table(data_by_loc, saving_path):
+    np.random.seed(1)
+    sorted_types = sorted(HFO_TYPES + ['Spikes'])
+    col_colors = []
+    rows = []
+    for loc, data in data_by_loc.items():
+        row = []
+        granularity = get_granularity(loc)
+        row.append(granularity)
+        row.append(loc)
+        row.append(data['patient_count'])
+        row.append(data['patients_with_epilepsy'])
+        row.append(data['elec_count'])
+        # row.append(data['soz_elec_count'])
+        row.append(data['PSE'])
+        for type in sorted_types:
+            row.append(data[type + '_N'])
+        rows.append(tuple(row))
+
+    # Order by granularity, loc_name
+    rows = sorted(rows, key=lambda x: (x[0], x[1]))
+
+    for row in rows:
+        col_colors.append(color_by_gran(row[0]))
+    col_names = ['Location', '#Patients', '#SOZPatients', '#Elec',
+                 'PSE'] + ['#{t}'.format(t=t) for t in sorted_types]  # PSE
+    col_width = [len(col_name) for col_name in col_names]
+    for r in range(len(rows)):
+        for c in range(1, len(rows[0])):  # granularity out
+            if len(str(rows[r][c])) > col_width[c - 1]:
+                col_width[c - 1] = len(str(rows[r][c]))
+    print(col_names)
+    print(col_width)
+    fig = go.Figure(
+        data=[go.Table(
+            columnwidth=[col_width[i] for i in range(len(col_width))],
+            header=dict(
+                values=['{b}{c}{b}'.format(b='<b>', c=col_names[i].ljust(
+                    col_width[i])) for i in range(len(col_names))],
+                line_color='black', fill_color='white',
+                align='left', font=dict(color='black', size=12)
+            ),
+            cells=dict(
+                values=[[r[i + 1] for r in rows] for i in
+                        range(len(col_names))],
+                # toma columnas, el +1 es porque no estoy imprimiendo granularity
+                fill_color=[np.array(col_colors) for i in
+                            range(len(col_names))],
+                align='left', font=dict(color='black', size=12)
+            ))
+        ])
+
+    row_height = 27
+    header_h = 45
+    table_h = header_h + row_height * len(rows)
+
+    fig.update_layout(
+        autosize=False,
+        height=table_h,
+        width=80 * len(col_names),
+        margin=dict(
+            l=10,
+            r=10,
+            b=10,
+            t=10,
+            pad=2
+        ))
+    orca_save(fig, saving_path)
+    fig.show()
+
+
+# Reviewed
+# 2) HFO rate comparison and features comparison in 4)
+def plot_feature_distribution(soz_data, nsoz_data, feature, type, stats,
+                              test_names, saving_dir):
+    saving_dir = str(Path(saving_dir, feature, type))
+    Path(saving_dir).mkdir(0o777, parents=True, exist_ok=True)
+    fig_path = str(Path(saving_dir, feature + '_distr.pdf'))
+    # print('Distribution saving path: {0}'.format(fig_path))
+    # print('Plotting feature:{f} for type:{t}'.format(
+    #    f=feature, t=type))
+    import seaborn as sns
+    sns.set_style("white")
+    # Plot
+    kwargs = dict(hist_kws={'alpha': .6}, kde_kws={'linewidth': 2})
+
+    fig = plt.figure(figsize=(10, 7), dpi=80)
+    fig.suptitle('{feat} SOZ vs NSOZ distributions'.format(
+        feat=feature.capitalize()),
+        fontsize=20)
+    plt.xlabel(feature.capitalize(), fontsize=18)
+    plt.ylabel('Frequency', fontsize=16)
+    sns.distplot(soz_data, color="red", label="SOZ", **kwargs)
+    sns.distplot(nsoz_data, color="green", label="NSOZ", **kwargs)
+    axes = fig.gca()
+    '''
+    # Prints stats in figure
+    X = {'D':0.05, 'W':0.35, 'U':0.65}
+    for S_name in test_names.keys():
+        S_val = round(stats[feature][type][test_names[S_name]][S_name], 4)
+        S_pval = format(stats[feature][type][test_names[S_name]]['pval'],'.2e')
+        # For text block coords (0, 0) is bottom and (1, 1) is top
+        axes.text(x=X[S_name],
+                  y=0.88,
+                  s='{t_name}\n{S_name}: {S_val} \npVal: {S_pval}'.format(
+                      t_name=test_names[S_name],
+                      S_name=S_name,
+                      S_val=S_val,
+                      S_pval=S_pval),
+                  bbox=dict(facecolor='grey', alpha=0.5),
+                  transform=axes.transAxes, fontsize=12)
+        #plt.xlim(50, 75)
+    '''
+    plt.legend(loc='lower right')  # 'lower right'
+    fig.savefig(fig_path)
+    plt.close(fig)
+    # plt.show()
+
+
+def plot_types_feature_distribution(rates_by_type, feature, saving_dir):
+    saving_dir = str(Path(saving_dir, feature))
+    Path(saving_dir).mkdir(0o777, parents=True, exist_ok=True)
+    fig_path = str(Path(saving_dir, feature + '_distrs.pdf'))
+    # print('Distributions saving path: {0}'.format(fig_path))
+    import seaborn as sns
+    sns.set_style("white")
+    # Plot
+    subplot_index = {'RonO': 1, 'RonS': 2, 'Fast RonO': 3, 'Fast RonS': 4}
+    kwargs = dict(hist_kws={'alpha': .6}, kde_kws={'linewidth': 2})
+
+    fig = plt.figure(figsize=(10, 7), dpi=80)
+    fig.suptitle('{feat} SOZ vs NSOZ distributions'.format(
+        feat=feature.capitalize()),
+        fontsize=20)
+    bins_by_t = {'RonO': 15, 'RonS': 5, 'Fast RonO': 10, 'Fast RonS': 3}
+
+    for type in HFO_TYPES:
+        axe = plt.subplot('{r}{c}{i}'.format(r=2, c=2, i=subplot_index[type]))
+        axe.set_title(type, fontdict={'fontsize': 14}, loc='left')
+        axe.set_xlabel(feature.capitalize(), fontdict={'fontsize': 12})
+        axe.set_ylabel('Frequency', fontdict={'fontsize': 12})
+        soz_rates = rates_by_type[type]['soz']
+        nsoz_rates = rates_by_type[type]['nsoz']
+
+        sns.distplot(soz_rates, bins=bins_by_t[type], color="red",
+                     label="SOZ", **kwargs)
+        sns.distplot(nsoz_rates, bins=bins_by_t[type], color="green",
+                     label="NSOZ", **kwargs)
+
+        # cuanto significa el valor en xlim index comparado con el resto
+        def pval_rate(data, xlim_index):
+            return len([r for r in data if r >= data[xlim_index]]) / len(data)
+
+        def get_xlim(data, pval=0.008):
+            data = sorted(data)
+            xlim_index = len(data) - 1
+            while (pval_rate(data, xlim_index) <= pval):  # si no tiene tantas
+                # obs no lo ploteo para mejorar la visualizacion con zoom.
+                xlim_index -= 1
+            return data[xlim_index]
+
+        xlim = min(get_xlim(soz_rates), get_xlim(nsoz_rates))
+        # axe.set_xlim([-2, xlim])
+
+        soz_max_rate = round(max(rates_by_type[type]['soz']), 2)
+        nsoz_max_rate = round(max(rates_by_type[type]['nsoz']), 2)
+        # For text block coords (0, 0) is bottom and (1, 1) is top
+        axe.text(x=0.65,  # upper right
+                 y=0.75,
+                 s='Max elec rate\nsoz: {ms}\nnsoz: {mns}'.format(
+                     ms=soz_max_rate, mns=nsoz_max_rate),
+                 bbox=dict(facecolor='grey', alpha=0.5),
+                 transform=axe.transAxes, fontsize=10)
+        axe.legend(loc='lower right', prop={'size': 10})
+    fig.savefig(fig_path)
+    plt.close(fig)
+    # plt.show()
+
+
+# 3) Predicting SOZ with rate, used in almost all the steps to plot ROCs
+# Reviewed
+# Plots ROCs for SOZ predictor by hfo rate for different locations and event types
+# TODO adaptive legend boxes
+def event_rate_by_loc(hfo_type_data_by_loc, zoomed_type=None,
+                      metrics=['pse', 'pnee', 'auc'],
+                      title=None, colors=None, conf=None,
+                      roc_saving_path=FIG_FOLDER_DIR + 'fig',
+                      change_tab_path=None):
+    print('Plotting event rate by loc...')
+    plt.ioff()
+    fig = plt.figure(107, figsize=(8, 12))
+
+    # Subplots frames
+    subplot_count = len(hfo_type_data_by_loc.keys())
+    if subplot_count == 1:
+        rows = 1
+        cols = 1
+    elif subplot_count <= 2:
+        rows = 1
+        cols = 2
+    elif subplot_count <= 4:
+        rows = 2
+        cols = 2
+    elif subplot_count <= 6:
+        rows = 3
+        cols = 2
+    elif subplot_count < 10:
+        rows = 3
+        cols = 3
+    else:
+        raise RuntimeError('Subplot count not implemented')
+
+    subplot_index = 1
+    if zoomed_type is None:
+        title = 'Event types\' rate (events per minute)' if title is None else title
+        fig.suptitle(title, size=16)
+    else:
+        fig.suptitle(
+            '{0} subtypes\' rate (events per minute)'.format(zoomed_type))
+
+    for loc, rate_data_by_type in hfo_type_data_by_loc.items():
+        elec_count = None
+        axe = plt.subplot('{r}{c}{i}'.format(r=rows, c=cols, i=subplot_index))
+        title = '{l}'.format(l=loc)
+        plot_data = {type: {} for type in rate_data_by_type.keys()}
+        for type, rate_data in rate_data_by_type.items():
+            plot_data[type]['preds'] = rate_data['evt_rates']
+            plot_data[type]['labels'] = rate_data['soz_labels']
+            plot_data[type]['legend'] = '{t}.'.format(t=type)
+            scores = {}
+            if 'ec' in metrics:
+                scores['ec'] = rate_data['evt_count']
+            if 'pse' in metrics:
+                scores['pse'] = rate_data['pse']
+            if 'pnee' in metrics:
+                scores['pnee'] = rate_data['pnee']
+            if 'auc' in metrics:
+                scores['AUC_ROC'] = round(rate_data['AUC_ROC'], 2)
+            if 'Simulator' in type:
+                scores['conf'] = rate_data['conf']
+            plot_data[type]['scores'] = scores
+
+            if elec_count is None:
+                elec_count = rate_data['elec_count']
+            elif elec_count != rate_data['elec_count']:
+                print(
+                    'Elec count of type {0}: {1}, other elec_count {2}'.format(
+                        type, rate_data['elec_count'], elec_count))
+                raise RuntimeError(
+                    'Elec count disagreement among types in ROCs plot')
+
+        change_tab_path = roc_saving_path if change_tab_path is None else \
+            str(Path(Path(roc_saving_path).parent,
+                     loc.replace(' ', '_'),
+                     '3_ii_{l}_sleep_tagged'.format(l=loc.replace(' ',
+                                                                  '_'))  # TODO
+                     # name
+                     ))
+        # Plots axe for one location and all types
+        superimposed_rocs(plot_data, title, axe, elec_count, colors,
+                          change_tab_path)
+        subplot_index += 1
+    plt.subplots_adjust(wspace=0.4, hspace=0.4)
+    for fmt in ['pdf', 'png']:
+        saving_path_f = '{file_path}.{format}'.format(file_path=roc_saving_path,
+                                                      format=fmt)
+        # if fmt == 'pdf':
+        # print('ROC saving path: {0}'.format(saving_path_f))
+        plt.savefig(saving_path_f, bbox_inches='tight')
+    plt.show()
+    plt.close(fig)
+
+
+# Reviewed
+# Plots the ROCs of many types in a location given in plot_data, modifies the axe object
+# It also may build tables of the global info in that location if you uncomment that piece of code
+def superimposed_rocs(plot_data, title, axe, elec_count, colors=None,
+                      saving_path=None):
+    axe.set_title(title, fontdict={'fontsize': 14}, loc='left')
+    axe.plot([0, 1], [0, 1], 'r--')
+    axe.set_xlim([0, 1])
+    axe.set_ylim([0, 1])
+    axe.set_ylabel('TPR', fontdict={'fontsize': 10})
+    axe.set_xlabel('FPR', fontdict={'fontsize': 11})
+    # calculate the fpr and tpr for all thresholds of the classification
+    roc_data, pses = [], []
+    for type, info in plot_data.items():
+        fpr, tpr, threshold = metrics.roc_curve(info['labels'], info['preds'])
+        confidence = info['scores']['conf'] if 'Simulator' in type else None
+        if 'pse' in info['scores'].keys():
+            pses.append(info['scores']['pse'])
+        roc_data.append((type, fpr, tpr, info['scores']['AUC_ROC'], confidence))
+
+    roc_data.sort(key=lambda x: x[3], reverse=True)  # Orders descendent by AUC
+    if len(pses) > 0:
+        pse = pses[0]
+        for e in pses:
+            if e != pse:
+                # This shouldnt happen, soz electrodes should be independent of the type of them
+                raise RuntimeError(
+                    'SOZ electrode percentage disagreement among evt types of the same location')
+
+    columns, rows = [], []
+    i = 0
+
+    # For each type
+    for t, fpr, tpr, auc, conf in roc_data:
+        legend = plot_data[t]['legend'] + ' AUC %.2f' % auc
+        axe.plot(fpr, tpr, color_for(t) if colors is None else color_list[i],
+                 label=legend)
+
+        # Building report tables
+        rows.append([t] + [str(plot_data[t]['scores'][k]) for k in
+                           ['ec', 'pse', 'pnee', 'AUC_ROC'] if
+                           k in plot_data[t]['scores'].keys()])
+        i += 1
+
+    axe.legend(loc='lower right', prop={'size': 8})
+    info_text = 'Elec Count: {0}'.format(elec_count)
+    plot_pse_text = True
+    if len(pses) > 0 and plot_pse_text:
+        info_text = info_text + '\nPSE:            {0}'.format(
+            round(np.mean(pses), 2))
+    axe.text(0.05, 0.85, info_text, bbox=dict(facecolor='grey', alpha=0.5),
+             transform=axe.transAxes, fontsize=8)
+
+    columns = [title] + [k for k in ['ec', 'pse', 'pnee', 'AUC_ROC'] if
+                         k in plot_data[t][
+                             'scores'].keys()]  # Title here is the location
+    if saving_path is not None:
+        plot_score_in_loc_table(columns, rows, colors, saving_path)
+
+    # method II: ggplot
+    # df = pd.DataFrame(dict(fpr = fpr, tpr = tpr))
+    # ggplot(df, aes(x = 'fpr', y = 'tpr')) + geom_line() + geom_abline(linetype = 'dashed')
+
+
+# Reviewed
+# Unique location info table
+def plot_score_in_loc_table(columns, rows, colors=None, saving_path=None):
+    col_colors = [table_color_for(t) if colors is None else color_list[i] for
+                  i, t in enumerate(sorted([r[0] if r[0] in EVENT_TYPES else
+                                            r[1] for r in rows]))]
+    # font_colors = ['black' if c != 'blue' else 'white' for c in col_colors]
+    rows = sorted(rows, key=lambda x: x[0])  # Order by HFO type name
+    fig = go.Figure(
+        data=[go.Table(
+            header=dict(
+                values=['<b>' + c + '</b>' for c in columns],
+                line_color='black', fill_color='white',
+                align='left', font=dict(color='black', size=14)
+            ),
+            cells=dict(
+                values=[[r[i] for r in rows] for i in range(len(columns))],
+                line_color='black', fill_color='white',
+                align='right', font=dict(color='black', size=12)
+            ))
+        ])
+    col_width = 100
+    row_height = 50
+    fig.update_layout(
+        autosize=False,
+        width=col_width * len(columns),
+        height=row_height * (len(rows) + 1),
+        margin=dict(
+            l=20,
+            r=20,
+            b=20,
+            t=20,
+            pad=3
+        ))
+    orca_save(fig, saving_path)
+    # fig.show()
+
+
+# Reviewed
+# 3.ii Multiple location info table
+def plot_pse_hfo_rate_auc_table(data_by_loc, saving_path):
+    np.random.seed(1)
+    col_colors = []
+    rows = []
+    for loc, data in data_by_loc.items():
+        row = []
+        granularity = get_granularity(loc)
+        row.append(granularity)
+        row.append(loc)
+        row.append(data['PSE'])
+        sorted_types = sorted(HFO_TYPES)
+        for type in sorted_types:
+            row.append(round(data[type + '_AUC'], 2))
+        row.append(max(row[3:7]))  # row = 3:7 ['g','l','p','t1','t2','t3',
+        # 't4', 'max_auc_ti']
+        rows.append(tuple(row))
+
+    # Order by granularity, loc_name
+    # rows = sorted(rows, key=lambda x: (x[0], x[1]))
+
+    # Rank by AUC
+    rows = sorted(rows, reverse=True, key=lambda x: x[-1])  # orders by last row
+    # element,
+    # which is the maxs AUC of the 4 types
+
+    for row in rows:
+        col_colors.append(color_by_gran(row[0]))
+
+    fig = go.Figure(
+        data=[go.Table(
+            columnwidth=[100, 200, 100, 100, 100, 100, 100],
+            header=dict(
+                values=['{b}Granularity{b}'.format(b='<b>'),
+                        '{b}Location{b}'.format(b='<b>'),
+                        '{b}PSE{b}'.format(b='<b>'),
+                        '{b}{t}{b}'.format(b='<b>', t=sorted_types[0]),
+                        '{b}{t}{b}'.format(b='<b>', t=sorted_types[1]),
+                        '{b}{t}{b}'.format(b='<b>', t=sorted_types[2]),
+                        '{b}{t}{b}'.format(b='<b>', t=sorted_types[3]),
+                        ],
+                line_color='black', fill_color='white',
+                align='left', font=dict(color='black', size=10)
+            ),
+            cells=dict(
+                values=[[r[i] for r in rows] for i in range(len(rows[0]) - 1)],
+                fill_color=[np.array(col_colors) for i in
+                            range(len(rows[0]) - 1)],
+                align='left', font=dict(color='black', size=10)
+            ))
+        ])
+    col_width = 90
+    row_height = 50
+    fig.update_layout(
+        autosize=False,
+        width=col_width * 7,
+        # height=row_height * (len(rows) + 1),
+        margin=dict(
+            l=50,
+            r=50,
+            b=100,
+            t=100,
+            pad=4
+        ))
+    orca_save(fig, saving_path)
+    fig.show()
+
+
+# Reviewed
+# 3.ii Plots scatter and fits line
+def plot_co_pse_auc(data_by_loc, saving_path):
+    pse = []
+    auc = []
+    locations = []
+    colors = []
+    labels = []
+    from db_parsing import get_granularity
+    fig = plt.figure()
+    defined_legends = set()
+    for loc in data_by_loc.keys():
+        for type in HFO_TYPES:
+            if type + '_AUC' in data_by_loc[loc].keys():
+                pse.append(data_by_loc[loc]['PSE'])
+                auc.append(data_by_loc[loc][type + '_AUC'])
+                locations.append(loc)
+                granularity = get_granularity(loc)
+                colors.append(color_for_scatter(granularity, type,
+                                                loc == 'Hippocampus'))
+                labels.append(type + '_in_loc' + str(granularity) if loc !=
+                                                                     'Hippocampus' else
+                              'Hippocampus {0}'.format(
+                                  type))
+                if granularity == 2:
+                    marker = 'v'
+                elif granularity == 3:
+                    marker = '<'
+                elif granularity == 5:
+                    marker = '^'
+                else:
+                    raise ValueError('Granularity marker undefined')
+                label = None if labels[-1] in defined_legends else labels[-1]
+                defined_legends.add(label)
+                plt.scatter(pse[-1], auc[-1], c=colors[-1], label=label,
+                            marker=marker,
+                            )
+    axes = plt.gca()
+    axes.legend(loc='lower right', prop={'size': 10})
+    m, b = np.polyfit(pse, auc, 1)
+    X_plot = np.linspace(axes.get_xlim()[0], axes.get_xlim()[1], 100)
+    plt.plot(X_plot, m * X_plot + b, '-')
+    plt.xlabel('Percentage of SOZ electrodes (PSE)')
+    plt.ylabel('AUC ROC')
+    plt.title('Percentage of SOZ electrodes and HFO rate baseline relation')
+    plt.savefig(saving_path, bbox_inches='tight')
+    plt.show()
+    plt.close(fig)
+
+
+# 4 Machine learning ROCs
+
+def ml_training_plot(data_by_model, loc_name, hfo_type,
+                     roc=True, pre_rec=False,
+                     saving_dir=FIG_SAVE_PATH[4]['dir']):
+    fig = plt.figure()
+    fig.suptitle('SOZ HFO classfiers training in {0}'.format(loc_name),
+                 fontsize=16)
+    models_to_run = list(data_by_model.keys())
+    plot_axe = axes_by_model(plt, models_to_run)
+    for model_name in models_to_run:
+        # Plot ROC curve
+        curve_kind = 'ROC'
+        labels = data_by_model[model_name]['y']
+        probs = data_by_model[model_name]['probas']
+        fpr, tpr, thresholds = metrics.roc_curve(labels, probs)
+        youden = youden(fpr, tpr, thresholds)
+        plot_axe[model_name][curve_kind].plot(fpr, tpr, lw=1, alpha=0.8,
+                                              label='AUC = %0.2f. Youden = %0.2f' %
+                                                    (metrics.auc(fpr, tpr),
+                                                     youden))
+        plot_axe[model_name][curve_kind].plot([0, 1], [0, 1], linestyle='--',
+                                              lw=2, color='r', label='Chance',
+                                              alpha=.8)
+        set_titles('False Positive Rate', 'True Postive Rate', model_name,
+                   plot_axe[model_name][curve_kind])
+
+        # PRE REC
+        precision, recall, thresholds = metrics.precision_recall_curve(labels,
+                                                                       probs)
+        precision = np.array(list(reversed(list(precision))))
+        recall = np.array(list(reversed(list(recall))))
+        # thesholds = np.array(list(reversed(list(thresholds))))
+        ap = metrics.average_precision_score(labels, probs)
+        auc_val = metrics.auc(recall, precision)
+        curve_kind = 'PRE_REC'
+        plot_axe[model_name][curve_kind].plot(recall, precision, color='b',
+                                              label='AUC = %0.2f. AP = %0.2f' % (
+                                                  auc_val, ap),
+                                              lw=2, alpha=.8)
+        set_titles('Recall', 'Precision', model_name,
+                   plot_axe[model_name][curve_kind])
+
+    # Saving the figure
+    saving_path = str(Path(saving_dir, loc_name, hfo_type, 'ml_train_plot'))
+    for fmt in ['pdf', 'png']:
+        saving_path_f = '{file_path}.{format}'.format(file_path=saving_dir,
+                                                      format=fmt)
+        if fmt == 'pdf':
+            print('ROC saving path: {0}'.format(saving_path_f))
+        plt.savefig(saving_path_f, bbox_inches='tight')
+    plt.show()
+    plt.close(fig)
+
+def feature_importances(feature_list, importances, hfo_type_name):
+    fig = plt.figure()
+    axe = plt.subplot(111)
+    # plt.style.use('fivethirtyeight')
+
+    # Vertical bars
+    # x_values = list(range(len(importances)))
+    # axe.bar(importances, x_values, orientation='horizontal')
+    # plt.xticks(x_values, feature_list ) #rotation='vertical'
+
+    # Horizontal bars
+    pos = np.arange(len(feature_list))
+    rects = axe.barh(pos, importances,
+                     align='center',
+                     height=0.5,
+                     tick_label=feature_list)
+    axe.set_title('{0} Variable Importances'.format(hfo_type_name))
+    axe.set_ylabel('Importance')
+    axe.set_xlabel('Variable')
+    plt.show()
+
+
+# Auxiliary functions reviewed
+
+def color_for(t):
+    if 'RonS baseline model_pat' == t:
+        return 'blue'
+    if 'FPR' in t:
+        colors = ['darkred', 'firebrick', 'red', 'indianred', 'lightcoral',
+                  'aquamarine', 'springgreen', 'limegreen', 'green',
+                  'darkgreen']
+        return colors[int(t[-1])]
+    if t == 'HFOs':
+        return 'b'
+    if t == 'RonO+RonS+Fast RonO+Fast RonS':
+        return 'b'
+    if t == 'Fast RonO+Fast RonS+RonO+RonS':
+        return 'b'
+    if t == 'RonO':
+        return 'b'
+    if t == 'RonS':
+        return 'g'
+    if t == 'Fast RonO':
+        return 'm'
+    if t == 'Fast RonS':
+        return 'y'
+    if t == 'Spikes':
+        return 'c'
+    if t == 'Sharp Spikes':
+        return 'k'
+    if t == 'Spikes + Sharp Spikes':
+        return 'magenta'
+    if t == 'Filtered RonO':
+        return 'mediumslateblue'
+    if t == 'Filtered RonS':
+        return 'lime'
+    if t == 'Filtered Fast RonO':
+        return 'darkviolet'
+    if t == 'Filtered Fast RonS':
+        return 'gold'
+
+    raise ValueError('graphics.color_for is undefined for type: {0}'.format(t))
+
+
+def table_color_for(t):
+    if t == 'HFOs':
+        return 'blue'
+    if t == 'RonO+RonS+Fast RonO+Fast RonS':
+        return 'blue'
+    if t == 'RonO':
+        return 'blue'
+    if t == 'RonS':
+        return 'green'
+    if t == 'Fast RonO':
+        return 'magenta'
+    if t == 'Fast RonS':
+        return 'yellow'
+    if t == 'Spikes':
+        return 'lightcyan'
+    if t == 'Sharp Spikes':
+        return 'black'
+    if t == 'Spikes + Sharp Spikes':
+        return 'magenta'
+    if t == 'Filtered RonO':
+        return 'mediumslateblue'
+    if t == 'Filtered RonS':
+        return 'lime'
+    if t == 'Filtered Fast RonO':
+        return 'darkviolet'
+    if t == 'Filtered Fast RonS':
+        return 'gold'
+    else:
+        return 'white'
+        # raise ValueError('graphics.table_color_for is undefined for type: {
+        # 0}'.format(t))
+
+
+def color_for_scatter(granularity, type, hip=False):
+    color_by_type = {
+        'RonS': {2: 'darkgreen', 3: 'mediumseagreen', 5: 'lime',
+                 'Hippocampus': 'black'},
+        'RonO': {2: 'midnightblue', 3: 'mediumblue', 5: 'cornflowerblue',
+                 'Hippocampus': 'dimgrey'},
+        'Fast RonO': {2: 'darkorange', 3: 'orange', 5: 'wheat',
+                      'Hippocampus': 'darkgray'},
+        'Fast RonS': {2: 'darkred', 3: 'red', 5: 'lightcoral',
+                      'Hippocampus': 'lightgray'}
+    }
+    try:
+        if hip:
+            return color_by_type[type]['Hippocampus']
+        else:
+            return color_by_type[type][3]
+    except Exception as e:
+        print('TYPE {0} GRANULARITY {1}'.format(type, granularity))
+        raise RuntimeError('Undefined color for granularity and type')
+
+
+def color_by_gran(granularity):
+    if granularity == 0:
+        return 'lightblue'
+    elif granularity == 2:
+        return 'lightsalmon'
+    elif granularity == 3:
+        return 'lightgreen'
+    elif granularity == 5:
+        return 'lightyellow'
+    else:
+        raise RuntimeError(
+            'Undefined color for granularity {0}'.format(granularity))
+
+
+def orca_save(fig, saving_path):
+    if Path(ORCA_EXECUTABLE).exists():
+        # print('Orca executable_path: {0}'.format(
+        #    plotly.io.orca.config.executable))
+        # plotly.io.orca.config.executable = orca_executable
+        # plotly.io.orca.config.save()
+        try:
+            fig.write_image(saving_path + '.pdf')
+            fig.write_html(saving_path + '.html')
+        except ValueError:
+            print('Orca executable is probably invalid, save figure manually.')
+    else:
+        print('You need to install orca and define orca executable to save '
+              'this figure.')
+
+
+# Reviewed
+def axes_by_model(plt, models_to_run):
+    subplot_count = len(models_to_run) * 2
+    if subplot_count == 2:
+        rows = 2
+        cols = 1
+    elif subplot_count == 4:
+        rows = 2
+        cols = 2
+    elif subplot_count == 6:
+        rows = 2
+        cols = 3
+    elif subplot_count == 8:
+        rows = 2
+        cols = 4
+    else:
+        raise RuntimeError('Subplot count not implemented')
+    axes = {}
+    subplot_index = 1
+    for m in models_to_run:
+        axes[m] = dict()
+        axes[m]['ROC'] = plt.subplot(
+            '{r}{c}{i}'.format(r=rows, c=cols, i=subplot_index))
+        subplot_index += 1
+    for m in models_to_run:
+        axes[m]['PRE_REC'] = plt.subplot(
+            '{r}{c}{i}'.format(r=rows, c=cols, i=subplot_index))
+        subplot_index += 1
+    return axes
+
+
+# Reviewed
+def set_titles(x_title, y_title, model_name, axe):
+    axe.set_xlim([-0.05, 1.05])
+    axe.set_ylim([-0.05, 1.05])
+    axe.set_xlabel(x_title)
+    axe.set_ylabel(y_title)
+    axe.set_title(model_name)
+    axe.legend(loc="lower right")
+
+
+def k_means_clusters_plot(data):
+    x = data['freq_av'] if 'freq_av' in data.keys() else data['freq_pk']
+    y = data['duration']
+    z = data['power_av'] if 'power_av' in data.keys() else data['power_pk']
+    fig = plt.figure()
+    ax = plt.axes(projection="3d")
+
+    ax.scatter3D(x, y, z, c=x, cmap='hsv', marker='o')
+    ax.set_xlabel('Freq av' if 'freq_av' in data.keys() else 'Freq pk')
+    ax.set_ylabel('Duration (ms)')
+    ax.set_zlabel('Power av' if 'power_av' in data.keys() else 'Power pk')
+
+    ax.set_title('FronO clusters')
+    ax.legend(loc="lower right")
+
+    plt.show()

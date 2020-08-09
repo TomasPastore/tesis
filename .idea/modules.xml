@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/tesis.iml" filepath="$PROJECT_DIR$/.idea/tesis.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/ieeg_soz_predictor.iml" filepath="$PROJECT_DIR$/.idea/ieeg_soz_predictor.iml" />
     </modules>
   </component>
 </project>
