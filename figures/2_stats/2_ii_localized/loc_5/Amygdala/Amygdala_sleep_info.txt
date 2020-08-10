@@ -1,0 +1,129 @@
+Data in Amygdala for types to compare... 
+
+Info from: Fast RonO
+Attributes               || Values
+----------------------------------
+patient_count            || 38
+patients_with_epilepsy   || 21
+elec_count               || 164
+mean_elec_per_pat        || 4.315789473684211
+soz_elec_count           || 54
+pse                      || 32.93
+pnee                     || 65.85
+evt_count                || 2341
+evt_count_per_type       || {'Fast RonO': 2341}
+AUC_ROC                  || 0.6136363636363636
+conf                     || None
+pat_with_x_null          || set()
+pat_with_y_null          || set()
+pat_with_z_null          || set()
+pat_with_loc2_empty      || set()
+pat_with_loc3_empty      || set()
+pat_with_loc5_empty      || set()
+elec_x_null              || 0
+elec_y_null              || 0
+elec_z_null              || 0
+elec_cnt_loc2_empty      || 0
+elec_cnt_loc3_empty      || 0
+elec_cnt_loc5_empty      || 0
+mean_of_rates            || 0.6019096723487795
+Count of patients with null coords: 0
+List of patients with null coords: set()
+Count of patients with empty loc: 0
+List of patients with empty loc: set()
+
+Info from: Fast RonS
+Attributes               || Values
+----------------------------------
+patient_count            || 38
+patients_with_epilepsy   || 21
+elec_count               || 164
+mean_elec_per_pat        || 4.315789473684211
+soz_elec_count           || 54
+pse                      || 32.93
+pnee                     || 40.24
+evt_count                || 2047
+evt_count_per_type       || {'Fast RonS': 2047}
+AUC_ROC                  || 0.694949494949495
+conf                     || None
+pat_with_x_null          || set()
+pat_with_y_null          || set()
+pat_with_z_null          || set()
+pat_with_loc2_empty      || set()
+pat_with_loc3_empty      || set()
+pat_with_loc5_empty      || set()
+elec_x_null              || 0
+elec_y_null              || 0
+elec_z_null              || 0
+elec_cnt_loc2_empty      || 0
+elec_cnt_loc3_empty      || 0
+elec_cnt_loc5_empty      || 0
+mean_of_rates            || 0.48391852846281375
+Count of patients with null coords: 0
+List of patients with null coords: set()
+Count of patients with empty loc: 0
+List of patients with empty loc: set()
+
+Info from: RonO
+Attributes               || Values
+----------------------------------
+patient_count            || 38
+patients_with_epilepsy   || 21
+elec_count               || 164
+mean_elec_per_pat        || 4.315789473684211
+soz_elec_count           || 54
+pse                      || 32.93
+pnee                     || 85.98
+evt_count                || 69416
+evt_count_per_type       || {'RonO': 69416}
+AUC_ROC                  || 0.6804713804713804
+conf                     || None
+pat_with_x_null          || set()
+pat_with_y_null          || set()
+pat_with_z_null          || set()
+pat_with_loc2_empty      || set()
+pat_with_loc3_empty      || set()
+pat_with_loc5_empty      || set()
+elec_x_null              || 0
+elec_y_null              || 0
+elec_z_null              || 0
+elec_cnt_loc2_empty      || 0
+elec_cnt_loc3_empty      || 0
+elec_cnt_loc5_empty      || 0
+mean_of_rates            || 16.42057628565798
+Count of patients with null coords: 0
+List of patients with null coords: set()
+Count of patients with empty loc: 0
+List of patients with empty loc: set()
+
+Info from: RonS
+Attributes               || Values
+----------------------------------
+patient_count            || 38
+patients_with_epilepsy   || 21
+elec_count               || 164
+mean_elec_per_pat        || 4.315789473684211
+soz_elec_count           || 54
+pse                      || 32.93
+pnee                     || 64.63
+evt_count                || 8495
+evt_count_per_type       || {'RonS': 8495}
+AUC_ROC                  || 0.7363636363636363
+conf                     || None
+pat_with_x_null          || set()
+pat_with_y_null          || set()
+pat_with_z_null          || set()
+pat_with_loc2_empty      || set()
+pat_with_loc3_empty      || set()
+pat_with_loc5_empty      || set()
+elec_x_null              || 0
+elec_y_null              || 0
+elec_z_null              || 0
+elec_cnt_loc2_empty      || 0
+elec_cnt_loc3_empty      || 0
+elec_cnt_loc5_empty      || 0
+mean_of_rates            || 1.8955540705307963
+Count of patients with null coords: 0
+List of patients with null coords: set()
+Count of patients with empty loc: 0
+List of patients with empty loc: set()
