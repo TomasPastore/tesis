@@ -14,14 +14,14 @@ The aim of this code is to serve as tool to analyse a large HFO database.
 	Install python packages detailed in requirements.txt in project root
 
 # Run
-	From project root you can execute the following commands in shell: 
-	1) Run in interactive mode command: 
-	    **python src/main.py -i** 
-    2) Run an specific drive function setted in main() function manually:
-        **python src/main.py**  
-        
+    From project root you can execute the following commands in shell: 
+1) Run in interactive mode command: 
+    **python src/main.py -i** 
+2) Run an specific drive function setted in main() function manually:
+    **python src/main.py**  
+    
 # Project layout:
-
+<pre>
 ieeg_soz_predictor.
 ├── docs
 │   ├── bibliography
@@ -58,5 +58,5 @@ ieeg_soz_predictor.
     ├── tests.py                                                   \# Test suite
     ├── utils.py                                                 \# Usefull code
     └── validation_names_by_loc.json      \# Dict with random validation patient
-
+</pre>
 
