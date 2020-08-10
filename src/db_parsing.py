@@ -379,7 +379,7 @@ def load_patients(electrodes_collection, evt_collection, intraop,
 
         if loc_name == 'Whole Brain' and remove_elec_artifacts:
 
-            from ml_hfo_classifier import artifact_filter
+            from artifacts import artifact_filter
 
             for hfo_type in ['Fast RonO']:
                 patients_dic = artifact_filter(hfo_type, patients_dic)
@@ -453,6 +453,12 @@ def query_filters(intraop, event_type_names, loc, loc_name, hfo_subtypes=None,
         else:
             elec_filter[loc] = loc_name
             evt_filter[loc] = loc_name
+
+    # Remove all fRonOs and fRonSs with a mean frequency > 500 Hz.
+    # The reason is that a portion of the files were sampled at 1 kHz and
+    # HFOs>500 Hz would not be captured (T Nyquist)
+    # since Ripples go up to 250 HZ this doesn't affet them
+    evt_filter['freq_av'] = {'$lte': 500}
 
     print('Printing filters...')
     print(elec_filter)

@@ -18,7 +18,7 @@ def artifact_filter(hfo_type, patients_dic):
     :param patients_dic: Patient, Electrode, Event data structures
     :return: modified patients dic for type hfo_type
     '''
-    print('Entering filter for electrical artifacts')
+    print('\nEntering filter for electrical artifacts')
     remove_from_elec_by_pat = {p_name: [] for p_name in patients_dic.keys()}
     # For each patient I keep a list of elec names where we can gradually
     # remove candidates and update

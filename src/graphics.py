@@ -13,10 +13,8 @@ from db_parsing import get_granularity, parse_elec_name, EVENT_TYPES, \
     intraop_patients, HFO_TYPES
 
 # mplstyle.use(['ggplot', 'fast'])
-
-# TODO MOVE TO DB PARSING
-def encode_type_name(name):
-    return str(EVENT_TYPES.index(name) + 1)
+color_list = ['b', 'g', 'r', 'c', 'm', 'y', 'k',
+              'w']  # review, it was different
 
 # Reviewed
 # 1) Global info by location table
@@ -51,8 +49,10 @@ def plot_global_info_by_loc_table(data_by_loc, saving_path):
         for c in range(1, len(rows[0])):  # granularity out
             if len(str(rows[r][c])) > col_width[c - 1]:
                 col_width[c - 1] = len(str(rows[r][c]))
-    print(col_names)
-    print(col_width)
+
+    print('\n Generating table...')
+    print('Columns {0}'.format(col_names))
+    print('Column widths: {0}'.format(col_width))
     fig = go.Figure(
         data=[go.Table(
             columnwidth=[col_width[i] for i in range(len(col_width))],

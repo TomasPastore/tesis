@@ -1,7 +1,8 @@
-import os   # library for screen cleaning in interactive mode
+import os  # library for screen cleaning in interactive mode
 import sys  # library for exit() in interactive mode
 import time
 import warnings
+
 warnings.filterwarnings("ignore", module="matplotlib")
 warnings.simplefilter(action='ignore', category=FutureWarning)
 from conf import TEST_BEFORE_RUN, FRonO_KMEANS_EXP_DIR
@@ -9,6 +10,8 @@ from db_parsing import Database
 import tests
 from driver import Driver
 import unittest
+import argparse
+
 
 def main(interactive_exp_menu=False):
     db = Database()
@@ -18,7 +21,11 @@ def main(interactive_exp_menu=False):
     # Paper Frontiers
     # phase_coupling_paper(hfo_collection) # Paper Frontiers
 
-    # Thesis
+    # Paper FRonO
+    # from FRonO_paper import scratch_steps
+    # scratch_steps(elec_collection, evt_collection)
+
+    # Thesis and main project code
     if interactive_exp_menu:
         experiment_menu(exp_driver)
     else:
@@ -28,11 +35,10 @@ def main(interactive_exp_menu=False):
         # Call an specific driver function if not interactive mode
         exp_driver.run_experiment(number=2, roman_num='i', letter='b')
 
-        #FRonO_paper(elec_collection, evt_collection) #TODO remove
-
 def experiment_menu(exp_driver):
     clear_screen()
     print('Experiment list:')
+    print('                ')
     print('1) Data global analysis')
     print('2) Data stats analysis. Features and HFO rate in SOZ vs NSOZ.')
     print('3) Predicting SOZ with event rates: Baselines')
@@ -43,20 +49,20 @@ def experiment_menu(exp_driver):
     option = int(input('Choose a number from the options above: '))
 
     if option == 1:
-        exp_driver.run_experiment(number=1) # intraop and dimensions in
+        exp_driver.run_experiment(number=1)  # intraop and dimensions in
         # localized and whole brain regions
         go_to_menu_after(5, exp_driver)
     elif option == 2:
         # Data stats analysis
         exp_driver.run_experiment(number=2, roman_num='i', letter='b')
-        exp_driver.run_experiment(number=2, roman_num='ii') #localized
+        exp_driver.run_experiment(number=2, roman_num='ii')  # localized
         go_to_menu_after(5, exp_driver)
     elif option == 3:
         # Whole Brain simple model all HFOs vs Spikes'
         exp_driver.run_experiment(number=3, roman_num='0')
 
         # Whole Brain untagged (N = 91)
-        #exp_driver.run_experiment(number=3, roman_num='i', letter='a')
+        # exp_driver.run_experiment(number=3, roman_num='i', letter='a')
 
         # Whole Brain untagged (N = 57)
         exp_driver.run_experiment(number=3, roman_num='i', letter='b')
@@ -92,36 +98,29 @@ def experiment_menu(exp_driver):
         raise NotImplementedError('Option {0} was left as future '
                                   'work.'.format(option))
 
+
 def clear_screen():
     if os.name == 'nt':
         _ = os.system('cls')
     else:
         _ = os.system('clear')
 
+
 def go_to_menu_after(seconds, exp_driver):
-    seconds = 5
     while seconds > 0:
         print('Going back to menu in {0}...'.format(seconds))
         time.sleep(1)  # wait 1 sec
         seconds = seconds - 1
     experiment_menu(exp_driver)
 
-# TODO remove this code from here
-def FRonO_paper(elec_collection, evt_collection):
-    from soz_predictor import evt_rate_soz_pred_baseline_localized
-    evt_rate_soz_pred_baseline_localized(elec_collection,
-                                         evt_collection,
-                                         intraop=False,
-                                         restrict_to_tagged_coords=True,
-                                         restrict_to_tagged_locs=True,
-                                         evt_types_to_load=['Fast RonO'],
-                                         evt_types_to_cmp=[['Fast RonO']],
-                                         locations={0: ['Whole Brain']},
-                                         saving_dir=FRonO_KMEANS_EXP_DIR,
-                                         #return_pat_dic_by_loc=True,
-                                         plot_rocs=False,
-                                         remove_elec_artifacts=True)
-
 
 if __name__ == "__main__":
-    main(interactive_exp_menu=False)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-i", "--interactive_mode",
+                        help="Run the experiments interactively.",
+                        required=False,
+                        default=False,
+                        action='store_true',
+                        )
+    args = parser.parse_args()
+    main(interactive_exp_menu=args.interactive_mode)

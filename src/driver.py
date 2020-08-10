@@ -27,27 +27,26 @@ class Driver():
     def run_experiment(self, number, roman_num=None, letter=None):
         NOT_IMPLEMENTED_EXP = NotImplementedError('Not implemented experiment')
         if number == 1:
-            print('\nRunning exp 1) Data Global analysis...')
-            print('Sleep patients and data dimensions...')
+            print('\nRunning exp 1) Data Global analysis:'
+                  'Sleep patients and data dimensions...')
 
             scratch.print_non_intraop_patients(self.elec_collection,
                                                self.evt_collection)
 
             # TODO mention untagged data and discard untagged to simplify
             # TODO update manuscript tables with True True
+            Path(FIG_SAVE_PATH[1]).mkdir(parents=True, exist_ok=True)
+            saving_path_wb = str(Path(FIG_SAVE_PATH[1], 'whole_brain_table'))
             scratch.global_info_in_locations(self.elec_collection,
                                              self.evt_collection,
                                              intraop=False,
                                              locations={0: [WHOLE_BRAIN_L0C]},
                                              event_type_names=HFO_TYPES + [
                                                  'Spikes'],
-                                             restrict_to_tagged_coords=False,
-                                             # TODO update with True
-                                             restrict_to_tagged_locs=False,
-                                             # TODO idem above
-                                             saving_path=str(
-                                                 Path(FIG_SAVE_PATH[1],
-                                                      'whole_brain_table')))
+                                             restrict_to_tagged_coords=True,
+                                             restrict_to_tagged_locs=True,
+                                             saving_path=saving_path_wb)
+            saving_path_loc = str(Path(FIG_SAVE_PATH[1], 'localized_table'))
             scratch.global_info_in_locations(self.elec_collection,
                                              self.evt_collection,
                                              intraop=False,
@@ -59,11 +58,9 @@ class Driver():
                                                  'Spikes'],
                                              restrict_to_tagged_coords=True,
                                              restrict_to_tagged_locs=True,
-                                             saving_path=str(
-                                                 Path(FIG_SAVE_PATH[1],
-                                                      'localized_table')))
+                                             saving_path=saving_path_loc)
         elif number == 2:
-            print('\nRunning exp 2) Data stats analysis...')
+            print('\nRunning exp 2) Data stats analysis')
             print('Features and HFO rate distributions SOZ vs NSOZ')
             if roman_num == 'i':
                 if letter == 'a':
@@ -73,7 +70,7 @@ class Driver():
                     locations = {0: [WHOLE_BRAIN_L0C]}
                     saving_dir = FIG_SAVE_PATH[2]['i']['a']
                 elif letter == 'b':  # TODO rerun after artifact correction
-                    print('2.i.a Whole Brain, coords and locs tagged required')
+                    print('2.i.b Whole Brain, coords and locs tagged required')
                     restrict_to_tagged_coords = True
                     restrict_to_tagged_locs = True
                     locations = {0: [WHOLE_BRAIN_L0C]}

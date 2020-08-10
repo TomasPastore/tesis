@@ -1,4 +1,3 @@
-from db_parsing import EVENT_TYPES
 from random import choices
 
 
@@ -7,7 +6,10 @@ class Electrode():
     def __init__(self, name, soz, blocks, x, y, z,
                  soz_sc=None, events=None, loc1='empty', loc2='empty',
                  loc3='empty', loc4='empty', loc5='empty',
-                 event_type_names=EVENT_TYPES):
+                 event_type_names=None):
+        if event_type_names is None:
+            event_type_names = ['RonO', 'RonS', 'Spikes', 'Fast RonO',
+                                'Fast RonS', 'Sharp Spikes']
         if events is None:
             events = {type: [] for type in event_type_names}
         self.name = name
@@ -30,7 +32,10 @@ class Electrode():
 
     # Gives you the event rate per minute considering events iff it is of any type of the ones listed
     # in event_types
-    def get_events_rate(self, event_types=EVENT_TYPES):
+    def get_events_rate(self, event_types=None):
+        if event_types is None:
+            event_types = ['RonO', 'RonS', 'Spikes', 'Fast RonO',
+                           'Fast RonS', 'Sharp Spikes']
         block_rates = {block_id: [0, duration] for block_id, duration in
                        self.blocks.items()}
         for event_type in event_types:
@@ -44,7 +49,10 @@ class Electrode():
         block_rates_arr.sort()  # avoids num errors
         return sum(block_rates_arr) / len(self.blocks)
 
-    def get_events_count(self, event_types=EVENT_TYPES):
+    def get_events_count(self, event_types=None):
+        if event_types is None:
+            event_types = ['RonO', 'RonS', 'Spikes', 'Fast RonO',
+                           'Fast RonS', 'Sharp Spikes']
         result = 0
         for event_type in event_types:
             for block, count in self.evt_count[event_type].items():

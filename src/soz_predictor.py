@@ -60,7 +60,7 @@ def evt_rate_soz_pred_baseline_whole_brain(elec_collection, evt_collection,
     # Create info header
     info_saving_path = saving_path + '_info.txt'
     # Create parents dirs if they dont exist
-    Path(info_saving_path).parent.mkdir(0o777, parents=True, exist_ok=True)
+    Path(info_saving_path).parent.mkdir(parents=True, exist_ok=True)
     with open(info_saving_path, "w+") as file:
         print('Info data for Event types to compare...', file=file)
         for event_type_names in evt_types_to_cmp:
